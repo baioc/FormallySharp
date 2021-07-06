@@ -4,9 +4,10 @@ This template can be used to generate a full-stack web application using the [SA
 
 ## Install pre-requisites
 
-You'll need to install the following pre-requisites in order to build SAFE applications
+You'll need to install the following pre-requisites in order to build and run full-stack SAFE applications
 
 * [.NET Core SDK](https://www.microsoft.com/net/download) 5.0 or higher
+* [ASP.NET Core Runtime](https://dotnet.microsoft.com/apps/aspnet)
 * [Node LTS](https://nodejs.org/en/download/)
 
 ## Starting the application
