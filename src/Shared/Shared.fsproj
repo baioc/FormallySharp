@@ -4,7 +4,7 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Finite.fs" />
+    <Compile Include="Regular.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
