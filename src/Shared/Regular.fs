@@ -1,96 +1,179 @@
-/// Finite automata and regexps for the domain of regular formal languages.
+/// Finite automata and regexps for the domain of regular languages.
 
 namespace FormalLanguages
 
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
 type Regexp =
-    // primitives, used as atomic literals
-    | Void // Rejects all strings.
-    | Empty // The empty word.
-    | Symbol of char // A specific atomic symbol.
-    // combinations, should only be constructed through custom operators
+    private
+    | Symbol of char
     | Alternation of Set<Regexp>
     | Concatenation of List<Regexp>
     | KleeneClosure of Regexp
 
-    /// Choice: associative, neutral on `Void`, commutative and idempotent.
+    static member Zero = Alternation Set.empty
+    static member One = Concatenation List.empty
+
+    /// Choice operator, can accept either one of the given regexps.
     static member (+)(r: Regexp, s: Regexp) =
-        match r, s with
-        // neutral on Void
-        | Void, regex
-        | regex, Void -> regex
-        // sets guaratee associativity, commutativity and idempotency
-        | Alternation a, Alternation b -> Set.union a b |> Alternation
-        | Alternation s, r
-        | r, Alternation s -> Set.add r s |> Alternation
-        // if no argument was already a set, make one
-        | r, s -> Set.ofArray [| r; s |] |> Alternation
+        // active pattern to help identify special cases
+        let (|Zero|Regexp|) r =
+            if r = Regexp.Zero then
+                Zero r
+            else
+                Regexp r
 
-    /// Sequence: associative, neutral on `Empty` and annihilates on `Void`.
+        match r, s with
+        // if any operand is zero, return the other
+        | Zero _, regex
+        | regex, Zero _ -> regex
+        // when both are sets, unite them
+        | Alternation r, Alternation s -> Alternation <| Set.union r s
+        // when just one is a set, add the other one to the set
+        | Alternation set, regexp
+        | regexp, Alternation set -> Alternation <| Set.add regexp set
+        // when both are not sets, either apply idempotency or make a new set
+        | r, s ->
+            if r = s then
+                r
+            else
+                Alternation <| Set([| r; s |])
+
+    /// Concatenation operator, must accept the first, then the second regexp.
     static member (*)(r: Regexp, s: Regexp) =
+        let (|Zero|One|Regexp|) r =
+            if r = Regexp.Zero then Zero r
+            elif r = Regexp.One then One r
+            else Regexp r
+
         match r, s with
-        // neutral on Empty
-        | Empty, regex -> regex
-        | regex, Empty -> regex
-        // annihilates on Void
-        | Void, _ -> Void
-        | _, Void -> Void
-        // make sure we append in the right order, then we get associativity
-        | Concatenation a, Concatenation b -> List.append a b |> Concatenation
-        | Concatenation seq, regex -> List.append seq [ regex ] |> Concatenation
-        | regex, Concatenation seq -> regex :: seq |> Concatenation
-        | r, s -> [ r; s ] |> Concatenation
+        // if any operand is zero, return zero
+        | Zero zero, _
+        | _, Zero zero -> zero
+        // if any operand is one, return the other
+        | One _, regex
+        | regex, One _ -> regex
+        // when both are lists, append them
+        | Concatenation a, Concatenation b -> Concatenation <| List.append a b
+        // when just one is a list, append the other in the right order
+        | Concatenation seq, regexp -> Concatenation <| List.append seq [ regexp ]
+        | regexp, Concatenation seq -> Concatenation <| regexp :: seq
+        // otherwise, concatenate them
+        | r, s -> Concatenation <| [ r; s ]
 
-    /// Kleene closure: zero or more repetitions of a regex.
+    /// Kleene star/closure operator: zero or more repetitions of a regexp.
     static member (!*)(r: Regexp) =
-        match r with
-        // by definition, 0* = 1* = 1, where 0=Void and 1=Empty
-        | Void
-        | Empty -> Empty
-        // it is also idempotent: (r*)* = r*
-        | KleeneClosure regex
-        | regex -> KleeneClosure regex
+        // by definition, 0* = 1* = 1
+        if r = Regexp.Zero then
+            Regexp.One
+        elif r = Regexp.One then
+            Regexp.One
+        // also, (r*)* = r*
+        else
+            match r with
+            | KleeneClosure r
+            | r -> KleeneClosure r
 
-    /// Optional: equivalent to `Empty + r`.
-    static member (!?)(r: Regexp) = Empty + r
+    /// Optional operator: equivalent to `1 + r`.
+    static member (!?)(r: Regexp) = Regexp.One + r
 
-    /// Positive closure: equivalent to `r * (!*r)`.
-    static member (!+)(r: Regexp) = r * (!*r)
+    /// Positive closure operator: equivalent to `r * !*r`.
+    static member (!+)(r: Regexp) = r * !*r
 
-    /// Repetition: fixed number of repetitions of a regex in sequence.
-    static member Pow(r: Regexp, n: int) =
-        List.init n (fun _ -> r) |> Concatenation
+    /// Repetition: fixed number of repetitions of a regexp in sequence.
+    /// XXX: the ugly (but grep-able) name disables using the ( ** ) operator,
+    /// which triggers a bug in Fable: https://github.com/fable-compiler/Fable/issues/2496
+    static member _Pow(r: Regexp, n: int) =
+        if n <= 0 then
+            Regexp.One
+        elif n = 1 then
+            r
+        else
+            Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
 
+    /// Pretty printing in a standard-ish format.
+    override this.ToString() =
+        let escaping = @"\()|*.^?"
+
+        match this with
+        | Symbol char ->
+            if String.exists ((=) char) escaping then
+                @"\" + string char
+            else
+                string char
+        | Alternation set ->
+            if Set.isEmpty set then
+                "(.^)"
+            elif Set.contains Regexp.One set then
+                set
+                |> Set.remove Regexp.One
+                |> Set.fold (+) Regexp.Zero
+                |> string
+                |> fun r -> r + "?"
+            else
+                String.concat "|" (Seq.map string set)
+                |> sprintf "(%s)"
+        | Concatenation seq ->
+            if List.isEmpty seq then
+                ""
+            else
+                String.concat "" (Seq.map string seq)
+                |> sprintf "(%s)"
+        | KleeneClosure regex -> string regex + "*"
+
+[<RequireQualifiedAccess>] // since we use standard collection names
 module Regexp =
+    /// Constructs a regexp for an atomic symbol.
+    let ofChar = Symbol
+
+    /// Singleton regexp that rejects everything.
+    let none = Regexp.Zero
+
+    /// Also known as epsilon, the empty string.
+    let empty = Regexp.One
+
+    /// Alias of (+)
     let union (r: Regexp) (s: Regexp) = r + s
+
+    /// Alias of (*)
     let append (r: Regexp) (s: Regexp) = r * s
+
+    /// Alias of (!*)
     let star (r: Regexp) = !*r
 
+    /// Constructs a regexp from a sequence of symbols.
+    let ofSeq group =
+        group |> Seq.map ofChar |> Seq.fold (*) Regexp.One
+
+    /// Constructs a regexp from an unordered set of symbols.
+    let ofSet group =
+        group
+        |> Seq.map Symbol
+        |> Seq.fold (+) Regexp.Zero
+
+    /// Alias of (!?)
     let maybe (r: Regexp) = !?r
+
+    /// Alias of (!+)
     let many (r: Regexp) = !+r
-    let init (n: int) (r: Regexp) = r ** n
 
-    let ofSeq seq =
-        Seq.map Symbol seq |> Seq.toList |> Concatenation
-
-    let ofSet set =
-        Seq.map Symbol set |> Set.ofSeq |> Alternation
+    /// Alternative for (**)
+    let init n (r: Regexp) = Regexp._Pow (r, n)
 
 
-/// Defines the generic interface of Finite-State Automata with mutable state.
+/// Defines the execution interface of Finite-State Automata with mutable state.
 type IAutomaton<'symbol, 'state> =
     interface
-        /// Current state, mutated on calls to `Step`.
+        /// State the machine is in.
         abstract member Current : 'state
 
         /// Whether or not the machine is currently in an accepting state.
         abstract member IsAccepting : bool
 
-        /// Steps the machine forward based on its current state and the given input.
+        /// Steps the machine forward based on the given input.
         abstract member Step : 'symbol -> unit
 
-        /// Resets this machine to its initial configuration.
+        /// Resets machine to its initial configuration.
         abstract member Reset : unit -> unit
     end
 
@@ -103,15 +186,15 @@ type DeterministicAutomaton<'symbol, 'state when 'symbol: comparison and 'state:
         ?dead: 'state
     ) =
 
-    let mutable current = initial
-
-    // steps forward by the given input, or keeps halted when in a dead state
-    let step (current, input) =
+    // steps by the given state and input, or keeps halted when in a dead state
+    let step arc =
         match dead with
-        | None -> Map.find (current, input) transition // this may throw
+        | None -> Map.find arc transition // this may throw
         | Some definedDeadState ->
-            Map.tryFind (current, input) transition
+            Map.tryFind arc transition
             |> Option.defaultValue definedDeadState
+
+    let mutable current = initial
 
     interface IAutomaton<'symbol, 'state> with
         member _.Current = current
@@ -127,44 +210,36 @@ type NondeterministicAutomaton<'symbol, 'state when 'symbol: comparison and 'sta
         accepts: Set<'state>
     ) =
 
-    // local definition of the empty word
-    let epsilon : option<'symbol> = None
-
-    // dead state is always properly defined for NFAs
-    let dead : Set<'state> = Set.empty
-
-    // get the next state set while ignoring epsilon transitions
-    let next (current, symbol) =
-        Map.tryFind (current, symbol) transition
-        |> Option.defaultValue dead
-
     // the machine is accepting whenever it is in at least one accepting state
     let hasAccepting states =
         Set.intersect accepts states |> Set.isEmpty |> not
 
+    // shallow next state, ignoring epsilon transitions
+    let next arc =
+        Map.tryFind arc transition |> Option.defaultValue Set.empty
+
     let rec epsilonReachable visited state =
         if Set.contains state visited then
-            Set.empty
+            Set.singleton state
         else
             let visited = Set.add state visited
-            let nextStates = next (state, epsilon)
-
+            let nextStates = next (state, None)
             nextStates
             |> Seq.map (epsilonReachable visited)
             |> Set.unionMany
             |> Set.add state
 
-    let mutable epsilonCache =
-        new System.Collections.Generic.Dictionary<'state, Set<'state>>()
-
+    // we find epsilon closures by depth-first traversal, then we cache them
+    let mutable epsilonCache = Map.empty
     let epsilonClosure state =
-        if epsilonCache.ContainsKey state then
-            epsilonCache.[state]
-        else
+        match Map.tryFind state epsilonCache with
+        | Some cached -> cached
+        | None ->
             let closure = epsilonReachable Set.empty state
-            epsilonCache.[state] <- closure
+            epsilonCache <- Map.add state closure epsilonCache
             closure
 
+    // gets the next set of states after a non-deterministic transition
     let step (currentStates, input) =
         currentStates
         |> Seq.map
