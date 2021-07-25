@@ -111,7 +111,7 @@ type Regexp =
 [<RequireQualifiedAccess>] // since we use standard collection names
 module Regexp =
     /// Constructs a regexp for an atomic symbol.
-    let ofChar = Symbol
+    let ofChar s = Symbol s
 
     /// Singleton regexp that rejects everything.
     let none = Regexp.Zero
@@ -120,13 +120,13 @@ module Regexp =
     let empty = Regexp.One
 
     /// Alias of (+)
-    let union (r: Regexp) (s: Regexp) = r + s
+    let inline union (r: Regexp) (s: Regexp) = r + s
 
     /// Alias of (*)
-    let append (r: Regexp) (s: Regexp) = r * s
+    let inline append (r: Regexp) (s: Regexp) = r * s
 
     /// Alias of (!*)
-    let star (r: Regexp) = !*r
+    let inline star (r: Regexp) = !*r
 
     /// Constructs a regexp from a sequence of symbols.
     let ofSeq group =
@@ -134,16 +134,16 @@ module Regexp =
 
     /// Constructs a regexp from an unordered set of symbols.
     let ofSet group =
-        group |> Seq.map Symbol |> Seq.fold (+) Regexp.Zero
+        group |> Seq.map ofChar |> Seq.fold (+) Regexp.Zero
 
     /// Alias of (!?)
-    let maybe (r: Regexp) = !?r
+    let inline maybe (r: Regexp) = !?r
 
     /// Alias of (!+)
-    let many (r: Regexp) = !+r
+    let inline many (r: Regexp) = !+r
 
     /// Alternative for (**)
-    let init n (r: Regexp) = Regexp._Pow (r, n)
+    let inline init n (r: Regexp) = Regexp._Pow (r, n)
 
 
 open Formal.Automata

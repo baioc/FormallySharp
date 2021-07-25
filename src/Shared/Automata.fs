@@ -10,8 +10,8 @@ type IAutomaton<'State, 'Input, 'Output> =
 
 /// API for dealing with various types of automata.
 module Automaton =
-    let step (automaton: IAutomaton<_, _, _>) input = automaton.Step input
-    let view (automaton: IAutomaton<_, _, _>) = automaton.View
+    let inline step (automaton: IAutomaton<_, _, _>) input = automaton.Step input
+    let inline view (automaton: IAutomaton<_, _, _>) = automaton.View
 
     /// <summary>
     /// Feeds an input sequence to a machine while keeping track of how it reacts.

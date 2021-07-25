@@ -10,40 +10,42 @@ module Automaton =
     open Formal.Languages
     open System
 
+    let inline map s = Map.ofSeq s
+
     /// DFA over {0,1} that accepts even binary numbers with at least one digit.
     let even =
         { Dead = "dead"
           Current = "empty"
           Accepting = set [ "even" ]
           Transitions =
-              Map.ofList [ ("empty", '0'), "even"
-                           ("empty", '1'), "odd"
-                           ("even", '0'), "even"
-                           ("even", '1'), "odd"
-                           ("odd", '0'), "even"
-                           ("odd", '1'), "odd" ] }
+              map [ ("empty", '0'), "even"
+                    ("empty", '1'), "odd"
+                    ("even", '0'), "even"
+                    ("even", '1'), "odd"
+                    ("odd", '0'), "even"
+                    ("odd", '1'), "odd" ] }
 
     // NFA over {a,b} that accepts strings containing "abba" as a substring.
     let abba =
         { Current = set [ "$" ]
           Accepting = set [ "ABBA" ]
           Transitions =
-              Map.ofList [ ("$", Some 'a'), set [ "$"; "A" ]
-                           ("$", Some 'b'), set [ "$" ]
-                           ("A", Some 'b'), set [ "AB" ]
-                           ("AB", Some 'b'), set [ "ABB" ]
-                           ("ABB", Some 'a'), set [ "ABBA" ]
-                           ("ABBA", Some 'a'), set [ "ABBA" ]
-                           ("ABBA", Some 'b'), set [ "ABBA" ] ] }
+              map [ ("$", Some 'a'), set [ "$"; "A" ]
+                    ("$", Some 'b'), set [ "$" ]
+                    ("A", Some 'b'), set [ "AB" ]
+                    ("AB", Some 'b'), set [ "ABB" ]
+                    ("ABB", Some 'a'), set [ "ABBA" ]
+                    ("ABBA", Some 'a'), set [ "ABBA" ]
+                    ("ABBA", Some 'b'), set [ "ABBA" ] ] }
 
     /// An NFA with cyclic and reflexive epsilon transitions, rejects all input.
     let cyclic =
         { Current = set [ "A" ]
           Accepting = set []
           Transitions =
-              Map.ofList [ ("A", Automaton.epsilon), set [ "A"; "B"; "C" ]
-                           ("B", Automaton.epsilon), set []
-                           ("C", Automaton.epsilon), set [ "B"; "A" ] ] }
+              map [ ("A", Automaton.epsilon), set [ "A"; "B"; "C" ]
+                    ("B", Automaton.epsilon), set []
+                    ("C", Automaton.epsilon), set [ "B"; "A" ] ] }
 
     let exec automaton inputs =
         Automaton.trace automaton inputs
