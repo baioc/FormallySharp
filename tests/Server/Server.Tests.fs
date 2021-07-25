@@ -7,6 +7,8 @@ open Shared
 
 
 let server = testList "Server" [
+    Formal.Automata.Tests.Automaton.tests
+
     testCase "Adding valid Todo" <| fun _ ->
         let storage = Storage()
         let validTodo = Todo.create "TODO"
@@ -25,4 +27,4 @@ let all =  testList "All" [
 ]
 
 [<EntryPoint>]
-let main _ = runTests defaultConfig all
+let main _ = runTests { defaultConfig with verbosity = Logging.Debug } all

@@ -4,7 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Regular.Tests.fs" />
-    <Compile Include="Automata.Tests.fs" />
     <Compile Include="Shared.Tests.fs" />
   </ItemGroup>
   <ItemGroup>
