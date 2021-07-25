@@ -6,8 +6,8 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Shared
-open FormalLanguages.Tests
+open Formal.Languages.Tests
+
 
 let shared = testList "Shared" [
     Regexp.tests

@@ -1,6 +1,6 @@
-/// Finite automata and regexps for the domain of regular languages.
+/// Finite automata and regexp algebra for the domain of regular languages.
 
-namespace FormalLanguages
+namespace Formal.Languages
 
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
@@ -18,10 +18,7 @@ type Regexp =
     static member (+)(r: Regexp, s: Regexp) =
         // active pattern to help identify special cases
         let (|Zero|Regexp|) r =
-            if r = Regexp.Zero then
-                Zero r
-            else
-                Regexp r
+            if r = Regexp.Zero then Zero r else Regexp r
 
         match r, s with
         // if any operand is zero, return the other
@@ -33,11 +30,7 @@ type Regexp =
         | Alternation set, regexp
         | regexp, Alternation set -> Alternation <| Set.add regexp set
         // when both are not sets, either apply idempotency or make a new set
-        | r, s ->
-            if r = s then
-                r
-            else
-                Alternation <| Set([| r; s |])
+        | r, s -> if r = s then r else Alternation <| Set.ofArray [| r; s |]
 
     /// Concatenation operator, must accept the first, then the second regexp.
     static member (*)(r: Regexp, s: Regexp) =
@@ -84,41 +77,35 @@ type Regexp =
     /// XXX: the ugly (but grep-able) name disables using the ( ** ) operator,
     /// which triggers a bug in Fable: https://github.com/fable-compiler/Fable/issues/2496
     static member _Pow(r: Regexp, n: int) =
-        if n <= 0 then
-            Regexp.One
-        elif n = 1 then
-            r
-        else
-            Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
+        if n <= 0 then Regexp.One
+        elif n = 1 then r
+        else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
 
     /// Pretty printing in a standard-ish format.
     override this.ToString() =
-        let escaping = @"\()|*.^?"
+        let escapingCharacters = @"\()|*.^?"
 
         match this with
         | Symbol char ->
-            if String.exists ((=) char) escaping then
+            if String.exists ((=) char) escapingCharacters then
                 @"\" + string char
             else
                 string char
         | Alternation set ->
             if Set.isEmpty set then
-                "(.^)"
+                "(.^)" // regex to reject any input, including empty strings
             elif Set.contains Regexp.One set then
                 set
                 |> Set.remove Regexp.One
                 |> Set.fold (+) Regexp.Zero
-                |> string
-                |> fun r -> r + "?"
+                |> sprintf "%A?"
             else
-                String.concat "|" (Seq.map string set)
-                |> sprintf "(%s)"
+                String.concat "|" (Seq.map string set) |> sprintf "(%s)"
         | Concatenation seq ->
             if List.isEmpty seq then
                 ""
             else
-                String.concat "" (Seq.map string seq)
-                |> sprintf "(%s)"
+                String.concat "" (Seq.map string seq) |> sprintf "(%s)"
         | KleeneClosure regex -> string regex + "*"
 
 [<RequireQualifiedAccess>] // since we use standard collection names
@@ -147,9 +134,7 @@ module Regexp =
 
     /// Constructs a regexp from an unordered set of symbols.
     let ofSet group =
-        group
-        |> Seq.map Symbol
-        |> Seq.fold (+) Regexp.Zero
+        group |> Seq.map Symbol |> Seq.fold (+) Regexp.Zero
 
     /// Alias of (!?)
     let maybe (r: Regexp) = !?r
@@ -161,98 +146,78 @@ module Regexp =
     let init n (r: Regexp) = Regexp._Pow (r, n)
 
 
-/// Defines the execution interface of Finite-State Automata with mutable state.
-type IAutomaton<'symbol, 'state> =
-    interface
-        /// State the machine is in.
-        abstract member Current : 'state
+open Formal.Automata
 
-        /// Whether or not the machine is currently in an accepting state.
-        abstract member IsAccepting : bool
+// type aliases to make the following definitions more readable
+type private State = string
+type private Symbol = char
 
-        /// Steps the machine forward based on the given input.
-        abstract member Step : 'symbol -> unit
+/// Deterministic Finite Automaton (DFA) for regular language recognition.
+type Dfa =
+    { Transitions: Map<State * Symbol, State>
+      Current: State
+      Accepting: Set<State>
+      Dead: State }
 
-        /// Resets machine to its initial configuration.
-        abstract member Reset : unit -> unit
-    end
+    member this.States : Set<State> =
+        Map.toSeq this.Transitions
+        |> Seq.map (fun ((q, a), q') -> Set.ofArray [| q; q' |])
+        |> Set.unionMany
+        |> Set.add this.Current
+        |> Set.union this.Accepting
+        |> Set.add this.Dead
 
-/// Deterministic Finite Automaton (DFA) with optional explicit dead state.
-type DeterministicAutomaton<'symbol, 'state when 'symbol: comparison and 'state: comparison>
-    (
-        transition: Map<'state * 'symbol, 'state>,
-        initial: 'state,
-        accepts: Set<'state>,
-        ?dead: 'state
-    ) =
-
-    // steps by the given state and input, or keeps halted when in a dead state
-    let step arc =
-        match dead with
-        | None -> Map.find arc transition // this may throw
-        | Some definedDeadState ->
-            Map.tryFind arc transition
-            |> Option.defaultValue definedDeadState
-
-    let mutable current = initial
-
-    interface IAutomaton<'symbol, 'state> with
-        member _.Current = current
-        member _.IsAccepting = Set.contains current accepts
-        member _.Step(input) = current <- step (current, input)
-        member _.Reset() = current <- initial
-
-/// Non-deterministic Finite Automaton (NFA).
-type NondeterministicAutomaton<'symbol, 'state when 'symbol: comparison and 'state: comparison>
-    (
-        transition: Map<'state * option<'symbol>, Set<'state>>,
-        initial: 'state,
-        accepts: Set<'state>
-    ) =
-
-    // the machine is accepting whenever it is in at least one accepting state
-    let hasAccepting states =
-        Set.intersect accepts states |> Set.isEmpty |> not
-
-    // shallow next state, ignoring epsilon transitions
-    let next arc =
-        Map.tryFind arc transition |> Option.defaultValue Set.empty
-
-    let rec epsilonReachable visited state =
-        if Set.contains state visited then
-            Set.singleton state
-        else
-            let visited = Set.add state visited
-            let nextStates = next (state, None)
-            nextStates
-            |> Seq.map (epsilonReachable visited)
-            |> Set.unionMany
-            |> Set.add state
-
-    // we find epsilon closures by depth-first traversal, then we cache them
-    let mutable epsilonCache = Map.empty
-    let epsilonClosure state =
-        match Map.tryFind state epsilonCache with
-        | Some cached -> cached
-        | None ->
-            let closure = epsilonReachable Set.empty state
-            epsilonCache <- Map.add state closure epsilonCache
-            closure
-
-    // gets the next set of states after a non-deterministic transition
-    let step (currentStates, input) =
-        currentStates
-        |> Seq.map
-            (fun state ->
-                next (state, input)
-                |> Seq.map epsilonClosure
-                |> Set.unionMany)
+    member this.Alphabet : Set<Symbol> =
+        Map.toSeq this.Transitions
+        |> Seq.map (fun ((q, a), q') -> Set.singleton a)
         |> Set.unionMany
 
-    let mutable current = epsilonClosure initial
+    // Moore style: no output on transitions
+    interface IAutomaton<State, Symbol, unit> with
+        override this.View = this.Current
 
-    interface IAutomaton<option<'symbol>, Set<'state>> with
-        member _.Current = current
-        member _.IsAccepting = hasAccepting current
-        member _.Step(input) = current <- step (current, input)
-        member _.Reset() = current <- epsilonClosure initial
+        override this.Step input =
+            let next =
+                Map.tryFind (this.Current, input) this.Transitions
+                |> Option.defaultValue this.Dead
+
+            ({ this with Current = next } :> IAutomaton<_, _, _>), () // upcast
+
+/// Nondeterministic Finite Automaton (NFA) for regular language recognition.
+type Nfa =
+    { Transitions: Map<State * option<Symbol>, Set<State>>
+      Current: Set<State>
+      Accepting: Set<State> }
+    member _.Dead : Set<State> = Set.empty
+
+    member this.States : Set<State> =
+        Map.toSeq this.Transitions
+        |> Seq.map (fun ((q, a), q') -> Set.add q q')
+        |> Set.unionMany
+        |> Set.union this.Current
+        |> Set.union this.Accepting
+
+    member this.Alphabet : Set<Symbol> =
+        Map.toSeq this.Transitions
+        |> Seq.map (fun ((q, a), q') -> a)
+        |> Seq.filter Option.isSome
+        |> Seq.map Option.get
+        |> Set.ofSeq
+
+    interface IAutomaton<Set<State>, option<Symbol>, unit> with
+        override this.View = this.Current
+
+        override this.Step input =
+            let nextStates =
+                this.Current
+                |> Seq.map // for each state we're in
+                    (fun state ->
+                        // transition by the given input
+                        Map.tryFind (state, input) this.Transitions
+                        |> Option.defaultValue Set.empty
+                        // then unite the epsilon closures of each next state
+                        |> Seq.map (Automaton.epsilonClosure this.Transitions)
+                        |> Set.unionMany)
+                |> Set.unionMany // then get the union of all that
+
+            ({ this with Current = nextStates } :> IAutomaton<_, _, _>), ()

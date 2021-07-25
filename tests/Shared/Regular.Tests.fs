@@ -1,4 +1,4 @@
-namespace FormalLanguages.Tests
+module Formal.Languages.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha
@@ -6,7 +6,7 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open FormalLanguages
+open Formal.Languages
 
 
 module Regexp =
@@ -18,14 +18,11 @@ module Regexp =
             elif rand % 2 = 0 then Regexp.Zero
             else Regexp.One
 
-    // actually only generates atomic regexps (random symbols, zero and one)
+    /// Randomly generates atomic regexps (symbols, zeros and ones).
     let randomRegexps() =
         let sampleSize = 300
         let rand = System.Random()
-        seq {
-            for _ in 1 .. sampleSize do
-                rand.NextRegexp()
-        }
+        Seq.init sampleSize (fun _ -> rand.NextRegexp())
 
     let tests = testList "Regexp" [
         testCase "Associativity of (+)" <| fun _ ->
@@ -131,7 +128,7 @@ module Regexp =
                     Expect.equal (Regexp._Pow(r, 1)) r "For all r, (r**1) should be equal to (r)"
                     Expect.equal (Regexp._Pow(r, 2)) (r * r) "For all r, (r**2) should be equal to (r * r)")
 
-        testCase "Less algebraic names in the Regexp module" <| fun _ ->
+        testCase "The Regexp module contains non-algebraic names" <| fun _ ->
             Expect.equal Regexp.none Regexp.Zero "none should be an alias of Zero"
             Expect.equal Regexp.empty Regexp.One "empty should be an alias of One"
             let a = randomRegexps()

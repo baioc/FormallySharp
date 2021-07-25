@@ -20,14 +20,11 @@ type Storage() =
 
 let storage = Storage()
 
-storage.AddTodo(Todo.create "Create new SAFE project")
-|> ignore
+storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
 
-storage.AddTodo(Todo.create "Write your app")
-|> ignore
+storage.AddTodo(Todo.create "Write your app") |> ignore
 
-storage.AddTodo(Todo.create "Ship it !!!")
-|> ignore
+storage.AddTodo(Todo.create "Ship it !!!") |> ignore
 
 let todosApi =
     { getTodos = fun () -> async { return storage.GetTodos() }
