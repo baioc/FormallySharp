@@ -50,7 +50,7 @@ Target.create "Run" (fun _ ->
     |> runParallel
 )
 
-Target.create "RunTests" (fun _ ->
+Target.create "Tests" (fun _ ->
     run dotnet "build" sharedTestsPath
     [ "server", dotnet "watch run" serverTestsPath
       "client", dotnet "fable watch --run webpack-dev-server --config ../../webpack.tests.config.js" clientTestsPath ]
@@ -74,7 +74,7 @@ let dependencies = [
         ==> "Run"
 
     "InstallClient"
-        ==> "RunTests"
+        ==> "Tests"
 ]
 
 [<EntryPoint>]
