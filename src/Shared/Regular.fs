@@ -8,11 +8,11 @@ type Regexp =
     private
     | Symbol of char
     | Alternation of Set<Regexp>
-    | Concatenation of List<Regexp>
+    | Concatenation of Regexp list
     | KleeneClosure of Regexp
 
     static member Zero = Alternation Set.empty
-    static member One = Concatenation List.empty
+    static member One = Concatenation []
 
     /// Choice operator, can accept either one of the given regexps.
     static member (+)(r: Regexp, s: Regexp) =
@@ -30,7 +30,7 @@ type Regexp =
         | Alternation set, regexp
         | regexp, Alternation set -> Alternation <| Set.add regexp set
         // when both are not sets, either apply idempotency or make a new set
-        | r, s -> if r = s then r else Alternation <| Set.ofArray [| r; s |]
+        | r, s -> if r = s then r else Alternation <| set [ r; s ]
 
     /// Concatenation operator, must accept the first, then the second regexp.
     static member (*)(r: Regexp, s: Regexp) =
@@ -161,7 +161,7 @@ type Dfa =
 
     member this.States : Set<State> =
         Map.toSeq this.Transitions
-        |> Seq.map (fun ((q, a), q') -> Set.ofArray [| q; q' |])
+        |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
         |> Set.unionMany
         |> Set.add this.Current
         |> Set.union this.Accepting
@@ -169,7 +169,7 @@ type Dfa =
 
     member this.Alphabet : Set<Symbol> =
         Map.toSeq this.Transitions
-        |> Seq.map (fun ((q, a), q') -> Set.singleton a)
+        |> Seq.map (fun ((q, a), q') -> set [ a ])
         |> Set.unionMany
 
     // Moore style: no output on transitions
@@ -188,7 +188,7 @@ type Nfa =
     { Transitions: Map<State * option<Symbol>, Set<State>>
       Current: Set<State>
       Accepting: Set<State> }
-    member _.Dead : Set<State> = Set.empty
+    member _.Dead : Set<State> = set []
 
     member this.States : Set<State> =
         Map.toSeq this.Transitions
@@ -202,7 +202,7 @@ type Nfa =
         |> Seq.map (fun ((q, a), q') -> a)
         |> Seq.filter Option.isSome
         |> Seq.map Option.get
-        |> Set.ofSeq
+        |> set
 
     interface IAutomaton<Set<State>, option<Symbol>, unit> with
         override this.View = this.Current

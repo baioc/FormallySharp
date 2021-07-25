@@ -1,8 +1,6 @@
 namespace Formal.Automata
 
-open System.Runtime.CompilerServices
-
-[<Extension>]
+[<System.Runtime.CompilerServices.Extension>]
 module Automaton =
     type private DeterministicTransitions<'State, 'Input, 'Output when 'State: comparison and 'Input: comparison and 'Output: comparison> =
         Map<('State * 'Input), ('State * 'Output)>
@@ -14,7 +12,7 @@ module Automaton =
     let indeterminize : DeterministicTransitions<'Q, 'I, 'O> -> NonedeterministicTransitions<'Q, 'I, 'O> =
         fun transitionTable ->
             Map.toSeq transitionTable
-            |> Seq.map (fun ((q, i), (q', o)) -> (q, Some i), Set.singleton (q', o))
+            |> Seq.map (fun ((q, i), (q', o)) -> (q, Some i), set [ q', o ])
             |> Map.ofSeq
 
     /// Converts a nondeterministic transition table to a deterministic one.

@@ -1,4 +1,4 @@
-module Formal.Languages.Tests
+namespace Formal.Languages.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha
@@ -9,22 +9,25 @@ open Expecto
 open Formal.Languages
 
 
+[<RequireQualifiedAccess>]
 module Regexp =
-    type System.Random with
+    open System
+
+    type Random with
         member this.NextRegexp() =
             let rand = this.Next(128)
             let c = char rand
-            if not (System.Char.IsControl c) then Regexp.ofChar c
+            if not (Char.IsControl c) then Regexp.ofChar c
             elif rand % 2 = 0 then Regexp.Zero
             else Regexp.One
 
     /// Randomly generates atomic regexps (symbols, zeros and ones).
     let randomRegexps() =
         let sampleSize = 300
-        let rand = System.Random()
+        let rand = Random()
         Seq.init sampleSize (fun _ -> rand.NextRegexp())
 
-    let tests = testList "Regexp" [
+    let tests = testList "Regexps" [
         testCase "Associativity of (+)" <| fun _ ->
             let a = randomRegexps()
             let b = randomRegexps()
@@ -103,7 +106,7 @@ module Regexp =
                 "'abc' should be the equal to 'a' * 'b' * 'c'"
 
         testCase "Char ranges can be converted to regexps" <| fun _ ->
-            let alpha = [| 'a' .. 'z' |]
+            let alpha = [ 'a' .. 'z' ]
             let alphaGroup = Seq.map Regexp.ofChar alpha |> Seq.fold (+) Regexp.Zero
             Expect.equal (Regexp.ofSet alpha) alphaGroup "['a' .. 'z'] should be equal to /a-z/"
 
@@ -128,7 +131,7 @@ module Regexp =
                     Expect.equal (Regexp._Pow(r, 1)) r "For all r, (r**1) should be equal to (r)"
                     Expect.equal (Regexp._Pow(r, 2)) (r * r) "For all r, (r**2) should be equal to (r * r)")
 
-        testCase "The Regexp module contains non-algebraic names" <| fun _ ->
+        testCase "Non-algebraic names" <| fun _ ->
             Expect.equal Regexp.none Regexp.Zero "none should be an alias of Zero"
             Expect.equal Regexp.empty Regexp.One "empty should be an alias of One"
             let a = randomRegexps()

@@ -45,7 +45,7 @@ module Automaton =
         // depth-first traversal in a possibly cyclic graph
         let rec epsilonReachable visited state =
             if Set.contains state visited then
-                Set.empty // found a cycle
+                set []
             else
                 let visited = Set.add state visited
 

@@ -6,16 +6,23 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Formal.Languages.Tests
+open Shared
 
 
-let shared = testList "Shared" [
-    Regexp.tests
+[<RequireQualifiedAccess>]
+module Shared =
+    let tests = testList "Shared" [
+        Formal.Languages.Tests.Regexp.tests
+        Formal.Automata.Tests.Automaton.tests
 
-    testList "Misc" [
-        testCase "Empty string is not a valid description" <| fun _ ->
-            let expected = false
-            let actual = Todo.isValid ""
-            Expect.equal actual expected "Should be false"
+        testList "Misc" [
+            testCase "Empty string is not a valid description" <| fun _ ->
+                let expected = false
+                let actual = Todo.isValid ""
+                Expect.equal actual expected "Should be false"
+        ]
     ]
-]
+
+
+// TODO: this is only here to avoid changing names in client tests
+let shared = Shared.tests
