@@ -6,6 +6,7 @@ open Saturn
 
 open Shared
 
+
 type Storage() =
     let todos = ResizeArray<_>()
 
@@ -21,10 +22,9 @@ type Storage() =
 let storage = Storage()
 
 storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
-
 storage.AddTodo(Todo.create "Write your app") |> ignore
-
 storage.AddTodo(Todo.create "Ship it !!!") |> ignore
+
 
 let todosApi =
     { getTodos = fun () -> async { return storage.GetTodos() }
@@ -46,9 +46,8 @@ let app =
     application {
         url "http://0.0.0.0:8085"
         use_router webApp
-        memory_cache
-        use_static "public"
         use_gzip
+        memory_cache
     }
 
 run app
