@@ -7,8 +7,6 @@ open Shared
 
 
 let server = testList "Server" [
-    Formal.Automata.Tests.Automaton.tests
-
     testCase "Adding valid Todo" <| fun _ ->
         let storage = Storage()
         let validTodo = Todo.create "TODO"

@@ -1,6 +1,10 @@
 namespace Formal.Automata.Tests
 
+#if FABLE_COMPILER
+open Fable.Mocha
+#else
 open Expecto
+#endif
 
 open Formal.Automata
 
@@ -18,12 +22,12 @@ module Automaton =
           Current = "empty"
           Accepting = set [ "even" ]
           Transitions =
-              map [ ("empty", '0'), "even"
-                    ("empty", '1'), "odd"
-                    ("even", '0'), "even"
-                    ("even", '1'), "odd"
-                    ("odd", '0'), "even"
-                    ("odd", '1'), "odd" ] }
+              map [ ("empty", 0), "even"
+                    ("empty", 1), "odd"
+                    ("even", 0), "even"
+                    ("even", 1), "odd"
+                    ("odd", 0), "even"
+                    ("odd", 1), "odd" ] }
 
     // NFA over {a,b} that accepts strings containing "abba" as a substring.
     let abba =
@@ -40,21 +44,21 @@ module Automaton =
 
     /// An NFA with cyclic and reflexive epsilon transitions, rejects all input.
     let cyclic =
-        { Current = set [ "A" ]
+        { Current = set [ 'A' ]
           Accepting = set []
           Transitions =
-              map [ ("A", Automaton.epsilon), set [ "A"; "B"; "C" ]
-                    ("B", Automaton.epsilon), set []
-                    ("C", Automaton.epsilon), set [ "B"; "A" ] ] }
+              map [ ('A', Automaton.epsilon), set [ 'A'; 'B'; 'C' ]
+                    ('B', Automaton.epsilon), set []
+                    ('C', Automaton.epsilon), set [ 'B'; 'A' ] ] }
 
-    let exec automaton inputs =
+    let inline exec automaton inputs =
         Automaton.trace automaton inputs
         |> Seq.last
         |> fun ((q, i), (q', o)) -> q'
 
     module Expect =
         /// Runs an automaton over inputs and checks if it ends in the expected state.
-        let trace automaton inputs expected =
+        let inline trace automaton inputs expected =
                 Expect.equal (exec automaton inputs) expected
                     "Should have reached the expected state"
 
@@ -65,7 +69,7 @@ module Automaton =
             Expect.equal (Automaton.view abba) abba.Current message
 
         testCase "Polymorphic step" <| fun _ ->
-            Expect.trace even "10" "even"
+            Expect.trace even [ 1; 0 ] "even"
             Expect.trace abba (Seq.map Some "ab") (set [ "$"; "AB" ])
             Expect.trace cyclic [ Some '.' ] (set [])
 
@@ -73,13 +77,13 @@ module Automaton =
             let abba = Automaton.epsilonClosure abba.Transitions
             let cyclic = Automaton.epsilonClosure cyclic.Transitions
             Expect.equal (abba "$") (set [ "$" ]) "Closure from a state should contain itself"
-            Expect.equal (cyclic "A") (set [ "A"; "B"; "C" ]) "Should work with cyclic closures"
+            Expect.equal (cyclic 'A') (set [ 'A'; 'B'; 'C' ]) "Should work with cyclic closures"
 
         testCase "DFA execution" <| fun _ ->
             let rand = Random()
             for _ in 1 .. 100 do
                 let number = rand.Next()
-                let string = Convert.ToString(number, 2)
+                let string = Convert.ToString(number, 2) |> Seq.map (string >> int)
                 let expected = if number % 2 = 0 then "even" else "odd"
                 Expect.trace even string expected
 
@@ -96,18 +100,18 @@ module Automaton =
             let message = "Should have transitioned to dead state"
             let deadEven = { even with Current = even.Dead } :> IAutomaton<_, _, _>
             let deadAbba = { abba with Current = abba.Dead } :> IAutomaton<_, _, _>
-            Expect.equal (Automaton.step even '?') (deadEven, ()) message
+            Expect.equal (Automaton.step even 2) (deadEven, ()) message
             Expect.equal (Automaton.step abba (Some '?')) (deadAbba, ()) message
 
         testCase "State set inference" <| fun _ ->
             let message = "Should have inferred state set"
             Expect.equal even.States (set [ "dead"; "empty"; "even"; "odd" ]) message
             Expect.equal abba.States (set [ "$"; "A"; "AB"; "ABB"; "ABBA" ]) message
-            Expect.equal cyclic.States (set [ "A"; "B"; "C" ]) message
+            Expect.equal cyclic.States (set [ 'A'; 'B'; 'C' ]) message
 
         testCase "Alphabet inference" <| fun _ ->
             let message = "Should have inferred input alphabet"
-            Expect.equal even.Alphabet (set "01") message
+            Expect.equal even.Alphabet (set [ 0; 1 ]) message
             Expect.equal abba.Alphabet (set "ab") message
             Expect.equal cyclic.Alphabet (set "") message
     ]

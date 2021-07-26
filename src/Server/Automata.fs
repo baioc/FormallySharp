@@ -20,4 +20,4 @@ module Automaton =
     /// This is NOT the inverse of `indeterminize`, since nondeterministic
     /// states and outputs get wrapped into sets of states and sets of outputs.
     let determinize : NonedeterministicTransitions<'Q, 'I, 'O> -> DeterministicTransitions<Set<'Q>, 'I, Set<'O>> =
-        fun table -> failwith "TODO: determinize"
+        fun table -> failwith "FIXME: implement determinize"

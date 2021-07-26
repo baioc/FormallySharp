@@ -13,6 +13,7 @@ open Shared
 module Shared =
     let tests = testList "Shared" [
         Formal.Languages.Tests.Regexp.tests
+        Formal.Automata.Tests.Automaton.tests
 
         testList "Misc" [
             testCase "Empty string is not a valid description" <| fun _ ->
