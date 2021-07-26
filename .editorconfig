@@ -15,6 +15,4 @@ fsharp_max_dot_get_expression_width = 70
 fsharp_max_record_width = 40
 fsharp_max_array_or_list_width = 60
 fsharp_max_array_or_list_number_of_items = 4
-
-[src/Client/*.fs]
-fsharp_single_argument_web_mode = true # Feliz style
+fsharp_single_argument_web_mode = true

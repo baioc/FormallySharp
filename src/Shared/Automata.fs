@@ -37,7 +37,7 @@ module Automaton =
 
     let epsilon = None
 
-    /// Finds the set reachable from a given initial state by epsilon transitions.
+    /// Finds the set reachable by epsilon transitions from a given state.
     let epsilonClosure table state =
         let nextStates arc =
             Map.tryFind arc table |> Option.defaultValue Set.empty
@@ -55,3 +55,9 @@ module Automaton =
                 |> Set.add state
 
         epsilonReachable Set.empty state
+
+    /// Trivial mapping of deterministic to nondeterministic transitions.
+    let inline indeterminize transitionTable =
+        Map.toSeq transitionTable
+        |> Seq.map (fun ((q, i), q') -> (q, Some i), set [ q' ])
+        |> Map.ofSeq
