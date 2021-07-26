@@ -7,15 +7,20 @@ open Shared
 
 
 let server = testList "Server" [
-    testCase "Adding valid Todo" <| fun _ ->
-        let storage = Storage()
-        let validTodo = Todo.create "TODO"
-        let expectedResult = Ok ()
+    Formal.Automata.Tests.Automaton.tests
+    Formal.Languages.Tests.Automaton.tests
 
-        let result = storage.AddTodo validTodo
+    testList "Misc" [
+        testCase "Adding valid Todo" <| fun _ ->
+            let storage = Storage()
+            let validTodo = Todo.create "TODO"
+            let expectedResult = Ok ()
 
-        Expect.equal result expectedResult "Result should be ok"
-        Expect.contains (storage.GetTodos()) validTodo "Storage should contain new todo"
+            let result = storage.AddTodo validTodo
+
+            Expect.equal result expectedResult "Result should be ok"
+            Expect.contains (storage.GetTodos()) validTodo "Storage should contain new todo"
+    ]
 ]
 
 

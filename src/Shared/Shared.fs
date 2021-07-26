@@ -28,30 +28,38 @@ module Todo =
           Description = description }
 
 
-// type aliases to make the following code more readable
-type private State = string
-type private Input = char
+open Formal.Languages
 
 // maps don't serialize to JSON that well, so we use sets of tuples instead
-type private DeterministicTransitions = Set<(State * Input) * State>
-type private NondeterministicTransitions = Set<(State * option<Input>) * Set<State>>
-type private DeterminizedTransitions = Set<(Set<State> * Input) * Set<State>>
+type private DeterministicTransitions = Set<(State * Symbol) * State>
+type private NondeterministicTransitions = Set<(State * option<Symbol>) * Set<State>>
+type private DeterminizedTransitions = Set<(Set<State> * Symbol) * Set<State>>
+
+type NondeterministicAutomaton =
+    { transitions: NondeterministicTransitions
+      initial: Set<State>
+      accepting: Set<State> }
+
+type EpsilonClosureArgs =
+    { initial: State
+      transitions: NondeterministicTransitions }
 
 type automata =
-    { determinize: NondeterministicTransitions -> Async<DeterminizedTransitions>
-      ``epsilon-closure``: {| state: State
-                              transitions: NondeterministicTransitions |} -> Async<Set<State>>
-      indeterminize: DeterministicTransitions -> Async<NondeterministicTransitions> }
+    { determinization: NondeterministicTransitions -> Async<DeterminizedTransitions>
+      indeterminization: DeterministicTransitions -> Async<NondeterministicTransitions>
+      union: NondeterministicAutomaton -> NondeterministicAutomaton -> Async<NondeterministicAutomaton>
+      hash: Object -> Async<string>
+      ``epsilon-closure``: EpsilonClosureArgs -> Async<Set<State>> }
 
 /// Shared automata examples.
 module Automata =
-    open Formal.Languages
     open Formal.Automata
 
-    let inline map s = Map.ofSeq s
+    // functional DSL style
+    let inline private map s = Map.ofSeq s
 
     /// DFA over {0,1} that accepts even binary numbers with at least one digit.
-    let even : Dfa<State, Input> =
+    let even =
         { Dead = "dead"
           Current = "empty"
           Accepting = set [ "even" ]
@@ -66,7 +74,7 @@ module Automata =
               ] }
 
     // NFA over {a,b} that accepts strings containing "abba" as a substring.
-    let abba : Nfa<State, Input> =
+    let abba =
         { Current = set [ "$" ]
           Accepting = set [ "ABBA" ]
           Transitions =
@@ -81,7 +89,7 @@ module Automata =
               ] }
 
     /// NFA with cyclic and reflexive epsilon transitions, rejects all input.
-    let cyclic : Nfa<State, Input> =
+    let cyclic =
         { Current = set [ "A" ]
           Accepting = set []
           Transitions =

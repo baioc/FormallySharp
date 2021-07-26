@@ -8,6 +8,7 @@
   <ItemGroup>
     <None Include="paket.references" />
     <Compile Include="Automata.fs" />
+    <Compile Include="Regular.fs" />
     <Compile Include="Server.fs" />
   </ItemGroup>
   <ItemGroup>

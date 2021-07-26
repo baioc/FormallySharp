@@ -148,14 +148,18 @@ module Regexp =
 
 open Formal.Automata
 
-/// Deterministic Finite Automaton (DFA) for regular language recognition.
-type Dfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
-    { Transitions: Map<('State * 'Symbol), 'State>
-      Current: 'State
-      Accepting: Set<'State>
-      Dead: 'State }
+// type aliases to improve readability
+type State = string
+type Symbol = char
 
-    member this.States : Set<'State> =
+/// Deterministic Finite Automaton (DFA) for regular language recognition.
+type Dfa =
+    { Transitions: Map<(State * Symbol), State>
+      Current: State
+      Accepting: Set<State>
+      Dead: State }
+
+    member this.States : Set<State> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
         |> Set.unionMany
@@ -163,13 +167,13 @@ type Dfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
         |> Set.union this.Accepting
         |> Set.add this.Dead
 
-    member this.Alphabet : Set<'Symbol> =
+    member this.Alphabet : Set<Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> set [ a ])
         |> Set.unionMany
 
     // Moore style: no output on transitions
-    interface IAutomaton<'State, 'Symbol, unit> with
+    interface IAutomaton<State, Symbol, unit> with
         override this.View = this.Current
 
         override this.Step input =
@@ -180,27 +184,27 @@ type Dfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
             ({ this with Current = next } :> IAutomaton<_, _, _>), () // upcast
 
 /// Nondeterministic Finite Automaton (NFA) for regular language recognition.
-type Nfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
-    { Transitions: Map<('State * option<'Symbol>), Set<'State>>
-      Current: Set<'State>
-      Accepting: Set<'State> }
-    member _.Dead : Set<'State> = set []
+type Nfa =
+    { Transitions: Map<(State * option<Symbol>), Set<State>>
+      Current: Set<State>
+      Accepting: Set<State> }
+    member _.Dead : Set<State> = set []
 
-    member this.States : Set<'State> =
+    member this.States : Set<State> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> Set.add q q')
         |> Set.unionMany
         |> Set.union this.Current
         |> Set.union this.Accepting
 
-    member this.Alphabet : Set<'Symbol> =
+    member this.Alphabet : Set<Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> a)
         |> Seq.filter Option.isSome
         |> Seq.map Option.get
         |> set
 
-    interface IAutomaton<Set<'State>, option<'Symbol>, unit> with
+    interface IAutomaton<Set<State>, option<Symbol>, unit> with
         override this.View = this.Current
 
         override this.Step input =
