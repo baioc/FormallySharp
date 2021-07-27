@@ -1,0 +1,25 @@
+.hero-body {
+}
+
+
+.hero {
+    background-color: #08BDEA;
+    align-items: stretch;
+    display: block;
+}
+
+.container {
+    /*  */
+}
+
+.column-odd {
+    background-color: #1B87A2;
+}
+
+hr {
+    background-color: whitesmoke;
+}
+
+.title {
+    color: whitesmoke;
+}

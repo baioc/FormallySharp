@@ -4,11 +4,15 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 
-type Model = { Todos: Todo list; Input: string }
+Fable.Core.JsInterop.importAll "/style.css"
+
+type Model = { Todos: Todo list; regularDefinitionString: string; tokenString: string; simulationString: string }
 
 type Msg =
     | GotTodos of Todo list
-    | SetInput of string
+    | SetRegularDefinitionString of string
+    | SetTokenString of string
+    | SetSimulationString of string
     | AddTodo
     | AddedTodo of Todo
 
@@ -18,7 +22,7 @@ let todosApi =
     |> Remoting.buildProxy<ITodosApi>
 
 let init () : Model * Cmd<Msg> =
-    let model = { Todos = []; Input = "" }
+    let model = { Todos = []; regularDefinitionString = ""; tokenString = ""; simulationString = ""}
 
     let cmd =
         Cmd.OfAsync.perform todosApi.getTodos () GotTodos
@@ -28,14 +32,16 @@ let init () : Model * Cmd<Msg> =
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | GotTodos todos -> { model with Todos = todos }, Cmd.none
-    | SetInput value -> { model with Input = value }, Cmd.none
+    | SetRegularDefinitionString value -> { model with regularDefinitionString = value }, Cmd.none
+    | SetTokenString value -> { model with tokenString = value }, Cmd.none
+    | SetSimulationString value -> { model with simulationString = value }, Cmd.none
     | AddTodo ->
-        let todo = Todo.create model.Input
+        let todo = Todo.create model.regularDefinitionString
 
         let cmd =
             Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
 
-        { model with Input = "" }, cmd
+        { model with regularDefinitionString = "" }, cmd
     | AddedTodo todo ->
         { model with
               Todos = model.Todos @ [ todo ] },
@@ -60,62 +66,43 @@ let navBrand =
 
 let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
-        // prop.className "columns"
-        // prop.children[
-        // Html.div[
-        //     prop.className "column"
-        //     prop.text "1"
-        // ]
-        // Html.div[
-        //     prop.className "column"
-        //     prop.text "2"
-        // ]
-        // Html.div[
-        //     prop.className "column"
-        //     prop.text "3"
-        // ]
-        // ]
         Bulma.textarea [
-            prop.value model.Input
+            prop.rows 20
+            prop.value model.regularDefinitionString
             prop.placeholder "Informe as expressões regulares"
-            prop.onChange (fun x -> SetInput x |> dispatch)
+            prop.onChange (fun x -> SetRegularDefinitionString x |> dispatch)
         ]
     ]
 
 let tokensBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
         Bulma.textarea [
-            prop.value model.Input
+            prop.rows 20
+            prop.value model.tokenString
             prop.placeholder "Informe os tokens"
-            prop.onChange (fun x -> SetInput x |> dispatch)
+            prop.onChange (fun x -> SetTokenString x |> dispatch)
         ]
     ]
 
 let simulatorBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
         Bulma.textarea [
-            prop.value model.Input
+            prop.rows 20
+            prop.value model.simulationString
             prop.placeholder "Insira o texto para simulação"
-            prop.onChange (fun x -> SetInput x |> dispatch)
+            prop.onChange (fun x -> SetSimulationString x |> dispatch)
         ]
     ]
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Bulma.hero [
         hero.isFullHeight
-        prop.style [
-            style.backgroundColor "#08BDEA"
-            style.backgroundSize "cover"
-            style.backgroundPosition "no-repeat center center fixed"
-        ]
         prop.children [
             Bulma.heroBody [
                 Bulma.container [
                     Bulma.columns[
                         Bulma.column [
-                            prop.style [
-                                style.backgroundColor "#1B87A2"
-                            ]
+                            prop.className "column-odd"
                             prop.children [
                                 Bulma.title [
                                     text.hasTextCentered
@@ -125,9 +112,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                         Bulma.column [
-                            prop.style [
-                                    style.backgroundColor "#1B87A2"
-                            ]
+                            prop.className "column-odd"
                             prop.children [
                                 Bulma.title [
                                     text.hasTextCentered
@@ -137,9 +122,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                         Bulma.column [
-                            prop.style [
-                                    style.backgroundColor "#1B87A2"
-                            ]
+                            prop.className "column-odd"
                             prop.children [
                                 Bulma.title [
                                     text.hasTextCentered
@@ -155,6 +138,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         // prop.disabled (Todo.isValid model.Input |> not)
                         prop.onClick (fun _ -> dispatch AddTodo)
                         prop.text "Analisador Léxico"
+                    ]
+                    Bulma.table [
+                        table.isFullWidth
                     ]
                 ]
             ]
