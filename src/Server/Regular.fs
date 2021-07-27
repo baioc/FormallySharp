@@ -9,7 +9,7 @@ module Automaton =
     let inline hash automaton =
         string automaton
         |> Text.Encoding.UTF8.GetBytes
-        // XXX: since Fable doesn't have MD5, we don't actually hash anything
+        // XXX: since Fable doesn't have built-in hashes, we just don't
         // |> (Security.Cryptography.MD5.Create()).ComputeHash
         |> Convert.ToBase64String
 

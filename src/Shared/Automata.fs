@@ -35,10 +35,8 @@ module Automaton =
                 yield! trace automaton inputs
             }
 
-    let epsilon = None
-
     /// Finds the set reachable by epsilon transitions from a given state.
-    let epsilonClosure table state =
+    let inline epsilonClosure table state =
         let nextStates arc =
             Map.tryFind arc table |> Option.defaultValue Set.empty
 
@@ -49,7 +47,7 @@ module Automaton =
             else
                 let visited = Set.add state visited
 
-                nextStates (state, epsilon)
+                nextStates (state, None)
                 |> Seq.map (epsilonReachable visited)
                 |> Set.unionMany
                 |> Set.add state

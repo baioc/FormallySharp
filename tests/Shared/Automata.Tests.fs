@@ -42,6 +42,17 @@ module Automaton =
             Expect.equal (abba "$") (set [ "$" ]) "Closure from a state should contain itself"
             Expect.equal (cyclic "A") (set [ "A"; "B"; "C" ]) "Should work with cyclic closures"
 
+        testCase "Indeterminization" <| fun _ ->
+            let nondetEven =
+                map [ ("empty", Some '0'), set [ "even" ]
+                      ("empty", Some '1'), set [ "odd" ]
+                      ("even", Some '0'), set [ "even" ]
+                      ("even", Some '1'), set [ "odd" ]
+                      ("odd", Some '0'), set [ "even" ]
+                      ("odd", Some '1'), set [ "odd" ] ]
+            Expect.equal (Automaton.indeterminize even.Transitions) nondetEven
+                "Should have been a trivial conversion"
+
         testCase "DFA execution" <| fun _ ->
             let rand = Random()
             for _ in 1 .. 100 do

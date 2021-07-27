@@ -2,11 +2,13 @@
 
 namespace Formal.Languages
 
+type private Symbol = char
+
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
 type Regexp =
     private
-    | Symbol of char
+    | Symbol of Symbol
     | Alternation of Set<Regexp>
     | Concatenation of Regexp list
     | KleeneClosure of Regexp
@@ -74,8 +76,8 @@ type Regexp =
     static member (!+)(r: Regexp) = r * !*r
 
     /// Repetition: fixed number of repetitions of a regexp in sequence.
-    /// XXX: the ugly (but grep-able) name disables using the ( ** ) operator,
-    /// which triggers a bug in Fable: https://github.com/fable-compiler/Fable/issues/2496
+    // XXX: the ugly (but grep-able) name disables using the ( ** ) operator,
+    // which triggers a bug in Fable: https://github.com/fable-compiler/Fable/issues/2496
     static member _Pow(r: Regexp, n: int) =
         if n <= 0 then Regexp.One
         elif n = 1 then r
@@ -148,18 +150,14 @@ module Regexp =
 
 open Formal.Automata
 
-// type aliases to improve readability
-type State = string
-type Symbol = char
-
 /// Deterministic Finite Automaton (DFA) for regular language recognition.
-type Dfa =
-    { Transitions: Map<(State * Symbol), State>
-      Current: State
-      Accepting: Set<State>
-      Dead: State }
+type DFA<'State when 'State: comparison> =
+    { Transitions: Map<('State * Symbol), 'State>
+      Current: 'State
+      Accepting: Set<'State>
+      Dead: 'State }
 
-    member this.States : Set<State> =
+    member this.States : Set<'State> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
         |> Set.unionMany
@@ -173,7 +171,7 @@ type Dfa =
         |> Set.unionMany
 
     // Moore style: no output on transitions
-    interface IAutomaton<State, Symbol, unit> with
+    interface IAutomaton<'State, Symbol, unit> with
         override this.View = this.Current
 
         override this.Step input =
@@ -184,13 +182,13 @@ type Dfa =
             ({ this with Current = next } :> IAutomaton<_, _, _>), () // upcast
 
 /// Nondeterministic Finite Automaton (NFA) for regular language recognition.
-type Nfa =
-    { Transitions: Map<(State * option<Symbol>), Set<State>>
-      Current: Set<State>
-      Accepting: Set<State> }
-    member _.Dead : Set<State> = set []
+type NFA<'State when 'State: comparison> =
+    { Transitions: Map<('State * option<Symbol>), Set<'State>>
+      Current: Set<'State>
+      Accepting: Set<'State> }
+    member _.Dead : Set<'State> = set []
 
-    member this.States : Set<State> =
+    member this.States : Set<'State> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> Set.add q q')
         |> Set.unionMany
@@ -204,7 +202,7 @@ type Nfa =
         |> Seq.map Option.get
         |> set
 
-    interface IAutomaton<Set<State>, option<Symbol>, unit> with
+    interface IAutomaton<Set<'State>, option<Symbol>, unit> with
         override this.View = this.Current
 
         override this.Step input =

@@ -9,4 +9,4 @@ module Automaton =
     let determinize
         (transitionTable: Map<('State * option<'Input>), Set<'State>>)
         : Map<(Set<'State> * 'Input), Set<'State>> =
-        failwith "TODO: implement `Automaton.determinize`"
+        failwith "FIXME: implement `Automaton.determinize`"
