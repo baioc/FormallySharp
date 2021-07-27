@@ -20,7 +20,7 @@ type Storage() =
 
 let storage = Storage()
 
-storage.AddTodo(Todo.create "Create new SAFE project")
+storage.AddTodo(Todo.create "Create new TETA project")
 |> ignore
 
 storage.AddTodo(Todo.create "Write your app")

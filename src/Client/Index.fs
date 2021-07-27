@@ -58,66 +58,103 @@ let navBrand =
         ]
     ]
 
-let containerBox (model: Model) (dispatch: Msg -> unit) =
-    Bulma.box [
-        Bulma.content [
-            Html.ol [
-                for todo in model.Todos do
-                    Html.li [ prop.text todo.Description ]
-            ]
+let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
+    Html.div[
+        // prop.className "columns"
+        // prop.children[
+        // Html.div[
+        //     prop.className "column"
+        //     prop.text "1"
+        // ]
+        // Html.div[
+        //     prop.className "column"
+        //     prop.text "2"
+        // ]
+        // Html.div[
+        //     prop.className "column"
+        //     prop.text "3"
+        // ]
+        // ]
+        Bulma.textarea [
+            prop.value model.Input
+            prop.placeholder "Informe as expressões regulares"
+            prop.onChange (fun x -> SetInput x |> dispatch)
         ]
-        Bulma.field.div [
-            field.isGrouped
-            prop.children [
-                Bulma.control.p [
-                    control.isExpanded
-                    prop.children [
-                        Bulma.input.text [
-                            prop.value model.Input
-                            prop.placeholder "What needs to be done?"
-                            prop.onChange (fun x -> SetInput x |> dispatch)
-                        ]
-                    ]
-                ]
-                Bulma.control.p [
-                    Bulma.button.a [
-                        color.isPrimary
-                        prop.disabled (Todo.isValid model.Input |> not)
-                        prop.onClick (fun _ -> dispatch AddTodo)
-                        prop.text "Add"
-                    ]
-                ]
-            ]
+    ]
+
+let tokensBox (model: Model) (dispatch: Msg -> unit) =
+    Html.div[
+        Bulma.textarea [
+            prop.value model.Input
+            prop.placeholder "Informe os tokens"
+            prop.onChange (fun x -> SetInput x |> dispatch)
+        ]
+    ]
+
+let simulatorBox (model: Model) (dispatch: Msg -> unit) =
+    Html.div[
+        Bulma.textarea [
+            prop.value model.Input
+            prop.placeholder "Insira o texto para simulação"
+            prop.onChange (fun x -> SetInput x |> dispatch)
         ]
     ]
 
 let view (model: Model) (dispatch: Msg -> unit) =
     Bulma.hero [
         hero.isFullHeight
-        color.isPrimary
         prop.style [
+            style.backgroundColor "#08BDEA"
             style.backgroundSize "cover"
-            style.backgroundImageUrl "https://unsplash.it/1200/900?random"
             style.backgroundPosition "no-repeat center center fixed"
         ]
         prop.children [
-            Bulma.heroHead [
-                Bulma.navbar [
-                    Bulma.container [ navBrand ]
-                ]
-            ]
             Bulma.heroBody [
                 Bulma.container [
-                    Bulma.column [
-                        column.is6
-                        column.isOffset3
-                        prop.children [
-                            Bulma.title [
-                                text.hasTextCentered
-                                prop.text "FormallySharp"
+                    Bulma.columns[
+                        Bulma.column [
+                            prop.style [
+                                style.backgroundColor "#1B87A2"
                             ]
-                            containerBox model dispatch
+                            prop.children [
+                                Bulma.title [
+                                    text.hasTextCentered
+                                    prop.text "Definição Regular"
+                                ]
+                                regularDefinitionBox model dispatch
+                            ]
                         ]
+                        Bulma.column [
+                            prop.style [
+                                    style.backgroundColor "#1B87A2"
+                            ]
+                            prop.children [
+                                Bulma.title [
+                                    text.hasTextCentered
+                                    prop.text "Tokens"
+                                ]
+                                tokensBox model dispatch
+                            ]
+                        ]
+                        Bulma.column [
+                            prop.style [
+                                    style.backgroundColor "#1B87A2"
+                            ]
+                            prop.children [
+                                Bulma.title [
+                                    text.hasTextCentered
+                                    prop.text "Simulador"
+                                ]
+                                simulatorBox model dispatch
+                            ]
+                        ]
+                    ]
+                    Html.hr[]
+                    Bulma.button.a [
+                        color.isDark
+                        // prop.disabled (Todo.isValid model.Input |> not)
+                        prop.onClick (fun _ -> dispatch AddTodo)
+                        prop.text "Analisador Léxico"
                     ]
                 ]
             ]
