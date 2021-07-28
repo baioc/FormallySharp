@@ -2,17 +2,20 @@ module Index
 
 open Elmish
 open Fable.Remoting.Client
+
 open Shared
 
-Fable.Core.JsInterop.importAll "./style.css"
 
-type Model = { RegularDefinitionString: string; TokenString: string; SimulationString: string; SimulatorOutputList: SimulatorOutput list }
+type Model =
+    { RegularDefinitionString: string
+      TokenString: string
+      SimulationString: string
+      SimulatorOutputList: SimulatorOutput list }
 
 type Msg =
     | SetRegularDefinitionString of string
     | SetTokenString of string
     | SetSimulationString of string
-    | SetOutputSimulationString of string
     | GetSimulatorOutput of SimulatorOutput list
     | AddSimulatorOutput
     | AddedSimulatorOutput of SimulatorOutput
@@ -23,7 +26,11 @@ let simulatorOutputApi =
     |> Remoting.buildProxy<ISimulatorOutputListApi>
 
 let init () : Model * Cmd<Msg> =
-    let model = { RegularDefinitionString = ""; TokenString = ""; SimulationString = ""; SimulatorOutputList = [] }
+    let model =
+        { RegularDefinitionString = ""
+          TokenString = ""
+          SimulationString = ""
+          SimulatorOutputList = [] }
 
     let cmd =
         Cmd.OfAsync.perform simulatorOutputApi.getSimulatorOutputList () GetSimulatorOutput
@@ -32,17 +39,25 @@ let init () : Model * Cmd<Msg> =
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | SetRegularDefinitionString value -> { model with RegularDefinitionString = value }, Cmd.none
+    | SetRegularDefinitionString value ->
+        { model with
+              RegularDefinitionString = value },
+        Cmd.none
     | SetTokenString value -> { model with TokenString = value }, Cmd.none
     | SetSimulationString value -> { model with SimulationString = value }, Cmd.none
-    | GetSimulatorOutput simulatorOutputList -> { model with SimulatorOutputList = simulatorOutputList }, Cmd.none
+    | GetSimulatorOutput simulatorOutputList ->
+        { model with
+              SimulatorOutputList = simulatorOutputList },
+        Cmd.none
     | AddSimulatorOutput ->
-        let simulatorOutput = SimulatorOutput.create("","",1)
+        let simulatorOutput = SimulatorOutput.create ("", "", 1)
 
         let cmd =
             Cmd.OfAsync.perform simulatorOutputApi.addSimulatorOutput simulatorOutput AddedSimulatorOutput
 
-        { model with RegularDefinitionString = "" }, cmd
+        { model with
+              RegularDefinitionString = "" },
+        cmd
     | AddedSimulatorOutput simulatorOutput ->
         { model with
               SimulatorOutputList = model.SimulatorOutputList @ [ simulatorOutput ] },
@@ -51,8 +66,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 open Feliz
 open Feliz.Bulma
 
+Fable.Core.JsInterop.importAll "./style.css"
+
 let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div[
+    Html.div [
         Bulma.textarea [
             prop.rows 20
             prop.value model.RegularDefinitionString
@@ -62,7 +79,7 @@ let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
     ]
 
 let tokensBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div[
+    Html.div [
         Bulma.textarea [
             prop.rows 20
             prop.value model.TokenString
@@ -72,7 +89,7 @@ let tokensBox (model: Model) (dispatch: Msg -> unit) =
     ]
 
 let simulatorBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div[
+    Html.div [
         Bulma.textarea [
             prop.rows 20
             prop.value model.SimulationString
@@ -106,7 +123,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         prop.children [
             Bulma.heroBody [
                 Bulma.container [
-                    Bulma.columns[
+                    Bulma.columns [
                         Bulma.column [
                             prop.className "column-odd"
                             prop.children [
@@ -138,7 +155,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         ]
                     ]
-                    Html.hr[]
+                    Html.hr []
                     Bulma.container [
                         Bulma.button.a [
                             color.isDark
@@ -148,6 +165,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     ]
 
                 ]
+
             ]
+
         ]
+
     ]

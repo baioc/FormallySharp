@@ -18,13 +18,13 @@ type Storage() =
 
 let storage = Storage()
 
-storage.AddSimulatorOutput(SimulatorOutput.create("a", "a", 1))
+storage.AddSimulatorOutput(SimulatorOutput.create ("a", "a", 1))
 |> ignore
 
-storage.AddSimulatorOutput(SimulatorOutput.create("b", "b", 2))
+storage.AddSimulatorOutput(SimulatorOutput.create ("b", "b", 2))
 |> ignore
 
-storage.AddSimulatorOutput(SimulatorOutput.create("c", "c", 3))
+storage.AddSimulatorOutput(SimulatorOutput.create ("c", "c", 3))
 |> ignore
 
 let simulatorOutputApi =

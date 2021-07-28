@@ -2,21 +2,21 @@ namespace Shared
 
 open System
 
-type Todo = { Id: Guid; Description: string }
-
-type SimulatorOutput = { Token : String; Lexema : String; Posicao: int }
+type SimulatorOutput =
+    { Token: String
+      Lexema: String
+      Posicao: int }
 
 module SimulatorOutput =
-    let create (token : String, lexema : String, posicao: int) =
+    let create (token: String, lexema: String, posicao: int) =
         { Token = token
           Lexema = lexema
-          Posicao = posicao}
+          Posicao = posicao }
 
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-type ISimulatorOutputListApi = {
-    getSimulatorOutputList: unit -> Async<SimulatorOutput list>
-    addSimulatorOutput: SimulatorOutput -> Async<SimulatorOutput>
-}
+type ISimulatorOutputListApi =
+    { getSimulatorOutputList: unit -> Async<SimulatorOutput list>
+      addSimulatorOutput: SimulatorOutput -> Async<SimulatorOutput> }
