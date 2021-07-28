@@ -4,7 +4,7 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 
-Fable.Core.JsInterop.importAll "/style.css"
+Fable.Core.JsInterop.importAll "./style.css"
 
 type Model = { RegularDefinitionString: string; TokenString: string; SimulationString: string; SimulatorOutputList: SimulatorOutput list }
 
