@@ -142,8 +142,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     Bulma.container [
                         Bulma.button.a [
                             color.isDark
-                            // prop.disabled (Todo.isValid model.Input |> not)
-                            // prop.onClick (fun _ -> dispatch AddTodo)
                             prop.text "Analisador Léxico"
                         ]
                         tableOutput model dispatch
