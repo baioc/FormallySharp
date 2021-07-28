@@ -9,8 +9,7 @@ module Automaton =
     let inline hash automaton =
         string automaton
         |> Text.Encoding.UTF8.GetBytes
-        // XXX: since Fable doesn't have built-in hashes, we just don't
-        // |> (Security.Cryptography.MD5.Create()).ComputeHash
+        |> (Security.Cryptography.MD5.Create()).ComputeHash
         |> Convert.ToBase64String
 
     let private renameAutomaton prefix automaton =

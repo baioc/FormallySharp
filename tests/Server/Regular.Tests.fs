@@ -7,7 +7,7 @@ open Formal.Languages
 
 [<RequireQualifiedAccess>]
 module Automaton =
-    open Shared.Automata
+    open Shared.Examples
 
     let tests = testList "Regular" [
         testCase "Automata hash" <| fun _ ->

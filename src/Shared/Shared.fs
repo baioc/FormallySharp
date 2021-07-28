@@ -28,15 +28,13 @@ open Formal.Languages
 
 type private State = string
 
-type automata =
-    { determinization: NFA<State> -> Async<DFA<Set<State>>>
-      indeterminization: DFA<State> -> Async<NFA<State>>
-      union: NFA<State> -> NFA<State> -> Async<NFA<State>>
-      hash: Object -> Async<State>
-      ``epsilon-closure``: Map<(State * Option<char>), Set<State>> -> State -> Async<Set<State>> }
+type IAutomata =
+    { Determinization: Nfa<State> -> Async<Dfa<Set<State>>>
+      Union: Nfa<State> -> Nfa<State> -> Async<Nfa<State>>
+      Hash: Object -> Async<State> }
 
-/// Shared automata examples.
-module Automata =
+
+module Examples =
     // functional DSL style
     let inline map s = Map.ofSeq s
 

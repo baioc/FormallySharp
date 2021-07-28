@@ -7,7 +7,7 @@ open Formal.Automata
 
 [<RequireQualifiedAccess>]
 module Automaton =
-    open Shared.Automata
+    open Shared.Examples
 
     let tests = testList "Automata" [
         ptestCase "NFA determinization" <| fun _ ->

@@ -45,10 +45,10 @@ let todosApi =
 
 open Formal.Automata
 open Formal.Languages
-open Shared.Automata
+open Shared.Examples
 
 let automataProtocol =
-    { determinization =
+    { Determinization =
           fun nfa ->
               async {
                   let determinized = Automaton.determinize nfa.Transitions
@@ -70,53 +70,32 @@ let automataProtocol =
                         Dead = set []
                         Current = initial }
               }
-      indeterminization =
-          fun dfa ->
-              async {
-                  return
-                      { Transitions = Automaton.indeterminize dfa.Transitions
-                        Accepting = dfa.Accepting
-                        Current = set [ dfa.Current ] }
-              }
-      union = fun a b -> async { return Automaton.union a b }
-      hash = fun obj -> async { return Automaton.hash obj }
-      ``epsilon-closure`` =
-          fun transitions initial -> async { return Automaton.epsilonClosure transitions initial } }
+      Union = fun a b -> async { return Automaton.union a b }
+      Hash = fun obj -> async { return Automaton.hash obj } }
 
 let automataApiDocs =
-    let docs = Docs.createFor<automata> ()
+    let docs = Docs.createFor<IAutomata> ()
 
     // the quoting mechanism doesn't like complex expressions: factor them out
     let abbaObj = (abba :> obj)
 
-    // XXX: Fable autodocs are not implemented for API functions with more than 1 param
+    // XXX: Fable autodoc examples are not implemented for methods with more than 1 param
     Remoting.documentation
         "Automata API"
-        [ docs.route <@ fun api -> api.determinization @>
+        [ docs.route <@ fun api -> api.Determinization @>
           |> docs.alias "Determinization"
           |> docs.description "Converts a nondeterministic transition table to a deterministic one"
-          |> docs.example <@ fun api -> api.determinization abba @>
+          |> docs.example <@ fun api -> api.Determinization abba @>
 
-          docs.route <@ fun api -> api.indeterminization @>
-          |> docs.alias "Indeterminization"
-          |> docs.description "Trivial mapping of deterministic to nondeterministic transitions"
-          |> docs.example <@ fun api -> api.indeterminization even @>
-
-          docs.route <@ fun api (a, b) -> api.union a b @>
+          docs.route <@ fun api (a, b) -> api.Union a b @>
           |> docs.alias "Union"
           |> docs.description "Union of two NFAs through epsilon transitions"
-          |> docs.example <@ fun api -> api.union abba cyclic @>
+          |> docs.example <@ fun api -> api.Union abba cyclic @>
 
-          docs.route <@ fun api -> api.hash @>
+          docs.route <@ fun api -> api.Hash @>
           |> docs.alias "Automata hash"
           |> docs.description "Base64-encoded string hash of an automaton"
-          |> docs.example <@ fun api -> api.hash abbaObj @>
-
-          docs.route <@ fun api (table, origin) -> api.``epsilon-closure`` table origin @>
-          |> docs.alias "Epsilon closure"
-          |> docs.description "Finds the set reachable by epsilon transitions from a given state"
-          |> docs.example <@ fun api -> api.``epsilon-closure`` cyclic.Transitions "A" @>
-          |> docs.example <@ fun api -> api.``epsilon-closure`` cyclic.Transitions "B" @> ]
+          |> docs.example <@ fun api -> api.Hash abbaObj @> ]
 
 let automataApi =
     Remoting.createApi ()

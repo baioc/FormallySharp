@@ -11,7 +11,7 @@ open Formal.Automata
 
 [<RequireQualifiedAccess>]
 module Automaton =
-    open Shared.Automata // provides example machines
+    open Shared.Examples
     open System
 
     let inline exec automaton inputs =

@@ -151,7 +151,7 @@ module Regexp =
 open Formal.Automata
 
 /// Deterministic Finite Automaton (DFA) for regular language recognition.
-type DFA<'State when 'State: comparison> =
+type Dfa<'State when 'State: comparison> =
     { Transitions: Map<('State * Symbol), 'State>
       Current: 'State
       Accepting: Set<'State>
@@ -182,7 +182,7 @@ type DFA<'State when 'State: comparison> =
             ({ this with Current = next } :> IAutomaton<_, _, _>), () // upcast
 
 /// Nondeterministic Finite Automaton (NFA) for regular language recognition.
-type NFA<'State when 'State: comparison> =
+type Nfa<'State when 'State: comparison> =
     { Transitions: Map<('State * option<Symbol>), Set<'State>>
       Current: Set<'State>
       Accepting: Set<'State> }
