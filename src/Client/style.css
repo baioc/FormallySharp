@@ -9,7 +9,7 @@
 }
 
 .container {
-    /*  */
+    display: grid;
 }
 
 .column-odd {
@@ -18,8 +18,31 @@
 
 hr {
     background-color: whitesmoke;
+    margin-top: 10px;
 }
 
 .title {
     color: whitesmoke;
+}
+
+table, td, th {
+    width: 100%;
+    margin-top: 20px;
+    background-color: #096981;
+    border: 1px solid black;
+    text-align: center;
+    padding: 0 20px 0 20px;
+}
+
+th {
+    color: whitesmoke !important;
+}
+
+td {
+    background-color: #1695b4;
+    color: black !important
+}
+
+.buttons {
+    align-items: center;
 }

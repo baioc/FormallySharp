@@ -6,69 +6,56 @@ open Shared
 
 Fable.Core.JsInterop.importAll "/style.css"
 
-type Model = { Todos: Todo list; regularDefinitionString: string; tokenString: string; simulationString: string }
+type Model = { RegularDefinitionString: string; TokenString: string; SimulationString: string; SimulatorOutputList: SimulatorOutput list }
 
 type Msg =
-    | GotTodos of Todo list
     | SetRegularDefinitionString of string
     | SetTokenString of string
     | SetSimulationString of string
-    | AddTodo
-    | AddedTodo of Todo
+    | SetOutputSimulationString of string
+    | GetSimulatorOutput of SimulatorOutput list
+    | AddSimulatorOutput
+    | AddedSimulatorOutput of SimulatorOutput
 
-let todosApi =
+let simulatorOutputApi =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<ITodosApi>
+    |> Remoting.buildProxy<ISimulatorOutputListApi>
 
 let init () : Model * Cmd<Msg> =
-    let model = { Todos = []; regularDefinitionString = ""; tokenString = ""; simulationString = ""}
+    let model = { RegularDefinitionString = ""; TokenString = ""; SimulationString = ""; SimulatorOutputList = [] }
 
     let cmd =
-        Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+        Cmd.OfAsync.perform simulatorOutputApi.getSimulatorOutputList () GetSimulatorOutput
 
     model, cmd
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | GotTodos todos -> { model with Todos = todos }, Cmd.none
-    | SetRegularDefinitionString value -> { model with regularDefinitionString = value }, Cmd.none
-    | SetTokenString value -> { model with tokenString = value }, Cmd.none
-    | SetSimulationString value -> { model with simulationString = value }, Cmd.none
-    | AddTodo ->
-        let todo = Todo.create model.regularDefinitionString
+    | SetRegularDefinitionString value -> { model with RegularDefinitionString = value }, Cmd.none
+    | SetTokenString value -> { model with TokenString = value }, Cmd.none
+    | SetSimulationString value -> { model with SimulationString = value }, Cmd.none
+    | GetSimulatorOutput simulatorOutputList -> { model with SimulatorOutputList = simulatorOutputList }, Cmd.none
+    | AddSimulatorOutput ->
+        let simulatorOutput = SimulatorOutput.create("","",1)
 
         let cmd =
-            Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
+            Cmd.OfAsync.perform simulatorOutputApi.addSimulatorOutput simulatorOutput AddedSimulatorOutput
 
-        { model with regularDefinitionString = "" }, cmd
-    | AddedTodo todo ->
+        { model with RegularDefinitionString = "" }, cmd
+    | AddedSimulatorOutput simulatorOutput ->
         { model with
-              Todos = model.Todos @ [ todo ] },
+              SimulatorOutputList = model.SimulatorOutputList @ [ simulatorOutput ] },
         Cmd.none
 
 open Feliz
 open Feliz.Bulma
 
-let navBrand =
-    Bulma.navbarBrand.div [
-        Bulma.navbarItem.a [
-            prop.href "https://safe-stack.github.io/"
-            navbarItem.isActive
-            prop.children [
-                Html.img [
-                    prop.src "/favicon.png"
-                    prop.alt "Logo"
-                ]
-            ]
-        ]
-    ]
-
 let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
         Bulma.textarea [
             prop.rows 20
-            prop.value model.regularDefinitionString
+            prop.value model.RegularDefinitionString
             prop.placeholder "Informe as expressões regulares"
             prop.onChange (fun x -> SetRegularDefinitionString x |> dispatch)
         ]
@@ -78,7 +65,7 @@ let tokensBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
         Bulma.textarea [
             prop.rows 20
-            prop.value model.tokenString
+            prop.value model.TokenString
             prop.placeholder "Informe os tokens"
             prop.onChange (fun x -> SetTokenString x |> dispatch)
         ]
@@ -88,9 +75,28 @@ let simulatorBox (model: Model) (dispatch: Msg -> unit) =
     Html.div[
         Bulma.textarea [
             prop.rows 20
-            prop.value model.simulationString
+            prop.value model.SimulationString
             prop.placeholder "Insira o texto para simulação"
             prop.onChange (fun x -> SetSimulationString x |> dispatch)
+        ]
+    ]
+
+let tableOutput (model: Model) (dispatch: Msg -> Unit) =
+    Html.table [
+        Html.thead [
+            Html.tr [
+                Html.th "Token"
+                Html.th "Lexema"
+                Html.th "Posição"
+            ]
+        ]
+        Html.tbody [
+            for simulatorOutput in model.SimulatorOutputList do
+                Html.tr [
+                    Html.td simulatorOutput.Token
+                    Html.td simulatorOutput.Lexema
+                    Html.td simulatorOutput.Posicao
+                ]
         ]
     ]
 
@@ -133,15 +139,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                     Html.hr[]
-                    Bulma.button.a [
-                        color.isDark
-                        // prop.disabled (Todo.isValid model.Input |> not)
-                        prop.onClick (fun _ -> dispatch AddTodo)
-                        prop.text "Analisador Léxico"
+                    Bulma.container [
+                        Bulma.button.a [
+                            color.isDark
+                            // prop.disabled (Todo.isValid model.Input |> not)
+                            // prop.onClick (fun _ -> dispatch AddTodo)
+                            prop.text "Analisador Léxico"
+                        ]
+                        tableOutput model dispatch
                     ]
-                    Bulma.table [
-                        table.isFullWidth
-                    ]
+
                 ]
             ]
         ]
