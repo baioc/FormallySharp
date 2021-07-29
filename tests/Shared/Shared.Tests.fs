@@ -11,9 +11,13 @@ open Shared
 
 [<RequireQualifiedAccess>]
 module Shared =
+    open Formally.Automata
+    open Formally.Regular
+
     let tests = testList "Shared" [
-        Formal.Automata.Tests.Automaton.tests
-        Formal.Languages.Tests.Regexp.tests
+        Tests.Automaton.tests
+        Tests.Regexp.tests
+        Tests.Nfa.tests
 
         testList "Misc" [
             testCase "Empty string is not a valid description" <| fun _ ->

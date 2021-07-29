@@ -1,61 +1,87 @@
-namespace Formal.Automata
+namespace Formally.Automata
 
-/// Generalized transducer with viewable state.
+
+/// Generalized automaton with viewable state.
 type IAutomaton<'State, 'Input, 'Output> =
     /// Steps the machine forward by the given input, producing some output.
-    abstract member Step : 'Input -> IAutomaton<'State, 'Input, 'Output> * 'Output
+    abstract member Step : 'Input -> 'Output * IAutomaton<'State, 'Input, 'Output>
 
     /// Get a view of the state the machine is currently in
     abstract member View : 'State
 
-/// API for dealing with various types of automata.
+
+/// API for using and combining generic automata as synchronous circuits.
+[<RequireQualifiedAccess>]
 module Automaton =
-    let inline step (automaton: IAutomaton<_, _, _>) input = automaton.Step input
-    let inline view (automaton: IAutomaton<_, _, _>) = automaton.View
+    /// Stepping function that can be piped with the (||>) operator.
+    let step input (automaton: IAutomaton<_, _, _>) = automaton.Step input
+
+    let view (automaton: IAutomaton<_, _, _>) = automaton.View
 
     /// <summary>
-    /// Feeds an input sequence to a machine while keeping track of how it reacts.
+    /// Feeds an input stream to a machine while keeping track of how it reacts.
     /// </summary>
     ///
     /// <returns>
-    /// Returns a sequence of transition logs `(q, i), (q', o)`, indicating the
-    /// machine outputted `o` when transitioning from `q` to `q'` by input `i`.
+    /// Returns a stream of trace logs `(a, i), (b, o)`, indicating the
+    /// machine outputted `o` when transitioning from `a` to `b` by input `i`.
     /// </returns>
-    let rec trace (automaton: IAutomaton<_, _, _>) inputs =
+    let rec trace inputs automaton =
         if Seq.isEmpty inputs then
             Seq.empty
         else
             seq {
-                let q = view automaton
+                let a = view automaton
                 let i = Seq.head inputs
-                let automaton, o = step automaton i
-                let q' = view automaton
-                yield (q, i), (q', o)
-                let inputs = Seq.tail inputs
-                yield! trace automaton inputs
+                let o, next = step i automaton
+                let b = view next
+                yield (a, i), (b, o)
+                let rest = Seq.tail inputs
+                yield! trace rest next
             }
 
-    /// Finds the set reachable by epsilon transitions from a given state.
-    let inline epsilonClosure table state =
-        let nextStates arc =
-            Map.tryFind arc table |> Option.defaultValue Set.empty
+    // triple adapter combinator, for internal usage only
+    let rec private withAdapters viewAdapter inputAdapter outputAdapter automaton =
+        { new IAutomaton<_, _, _> with
+            member __.View = view automaton |> viewAdapter
 
-        // depth-first traversal in a possibly cyclic graph
-        let rec epsilonReachable visited state =
-            if Set.contains state visited then
-                set []
-            else
-                let visited = Set.add state visited
+            member __.Step input =
+                let output, next = step (inputAdapter input) automaton
+                (outputAdapter output), (withAdapters viewAdapter inputAdapter outputAdapter next) }
 
-                nextStates (state, None)
-                |> Seq.map (epsilonReachable visited)
-                |> Set.unionMany
-                |> Set.add state
+    /// Wraps an automaton with a view adapter.
+    let withViewAdapter adapter = withAdapters adapter id id
 
-        epsilonReachable Set.empty state
+    /// Wraps an automaton with an input adapter.
+    let withInputAdapter adapter = withAdapters id adapter id
 
-    /// Trivial mapping of deterministic to nondeterministic transitions.
-    let inline indeterminize transitionTable =
-        Map.toSeq transitionTable
-        |> Seq.map (fun ((q, i), q') -> (q, Some i), set [ q' ])
-        |> Map.ofSeq
+    /// Wraps an automaton with an output adapter.
+    let withOutputAdapter adapter = withAdapters id id adapter
+
+    /// Combines two automata sequentially as if composing functions (and as in
+    /// function composition, `compose g f(x)` = `g(f(x))`, so mind the order).
+    let rec compose outer inner =
+        { new IAutomaton<_, _, _> with
+            member __.Step x =
+                let y, nextInner = step x inner
+                let z, nextOuter = step y outer
+                z, (compose nextOuter nextInner)
+
+            member __.View = view inner, view outer }
+
+    /// Combines two automata in synchronous parallelism.
+    let rec zip a b =
+        { new IAutomaton<_, _, _> with
+            member __.Step input =
+                let inA, inB = input
+                let outA, nextA = step inA a
+                let outB, nextB = step inB b
+                (outA, outB), (zip nextA nextB)
+
+            member __.View = view a, view b }
+
+    /// Makes a probe machine that simply pipes all input to its output.
+    let rec makeProbe initialValue =
+        { new IAutomaton<_, _, _> with
+            member __.View = initialValue
+            member __.Step x = x, (makeProbe x) }

@@ -1,4 +1,4 @@
-namespace Formal.Automata.Tests
+namespace Formally.Automata.Tests
 
 #if FABLE_COMPILER
 open Fable.Mocha
@@ -6,90 +6,58 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Formal.Automata
+open Formally.Automata
 
 
-[<RequireQualifiedAccess>]
-module Automaton =
-    open Shared.Examples
-    open System
-
-    let inline exec automaton inputs =
-        Automaton.trace automaton inputs
-        |> Seq.last
-        |> fun ((q, i), (q', o)) -> q'
+[<AutoOpen>]
+module Extensions =
+    module Automaton =
+        // XXX: helps Fable get type info of generic parameter
+#if FABLE_COMPILER
+        let inline exec inputs automaton =
+#else
+        let exec inputs automaton =
+#endif
+            Automaton.trace inputs automaton
+            |> Seq.last
+            |> fun ((q, i), (q', o)) -> q'
 
     module Expect =
         /// Runs an automaton over inputs and checks if it ends in the expected state.
+#if FABLE_COMPILER
         let inline trace automaton inputs expected =
-                Expect.equal (exec automaton inputs) expected
+#else
+        let trace automaton inputs expected =
+#endif
+                Expect.equal (Automaton.exec inputs automaton) expected
                     "Should have reached the expected state"
 
+module Automaton =
     let tests = testList "Automata" [
-        testCase "Polymorphic view" <| fun _ ->
-            let message = "Should be able to view initial state"
-            Expect.equal (Automaton.view even) even.Current message
-            Expect.equal (Automaton.view abba) abba.Current message
+        ptestCase "Automaton.step" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.step`"
 
-        testCase "Polymorphic step" <| fun _ ->
-            Expect.trace even "10" "even"
-            Expect.trace abba (Seq.map Some "ab") (set [ "$"; "AB" ])
-            Expect.trace cyclic [ Some '.' ] (set [])
+        ptestCase "Automaton.view" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.view`"
 
-        testCase "Epsilon closures" <| fun _ ->
-            let abba = Automaton.epsilonClosure abba.Transitions
-            let cyclic = Automaton.epsilonClosure cyclic.Transitions
-            Expect.equal (abba "$") (set [ "$" ]) "Closure from a state should contain itself"
-            Expect.equal (cyclic "A") (set [ "A"; "B"; "C" ]) "Should work with cyclic closures"
+        ptestCase "Automaton.trace" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.trace`"
 
-        testCase "Indeterminization" <| fun _ ->
-            let nondetEven =
-                map [ ("empty", Some '0'), set [ "even" ]
-                      ("empty", Some '1'), set [ "odd" ]
-                      ("even", Some '0'), set [ "even" ]
-                      ("even", Some '1'), set [ "odd" ]
-                      ("odd", Some '0'), set [ "even" ]
-                      ("odd", Some '1'), set [ "odd" ] ]
-            Expect.equal (Automaton.indeterminize even.Transitions) nondetEven
-                "Should have been a trivial conversion"
+        ptestCase "Automaton.withViewAdapter" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.withViewAdapter`"
 
-        testCase "DFA execution" <| fun _ ->
-            let rand = Random()
-            for _ in 1 .. 100 do
-                let number = rand.Next()
-                let binary = Convert.ToString(number, 2)
-                let expected = if number % 2 = 0 then "even" else "odd"
-                Expect.trace even binary expected
+        ptestCase "Automaton.withInputAdapter" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.withInputAdapter`"
 
-        testCase "NFA execution" <| fun _ ->
-            let rand = Random()
-            for _ in 1 .. 100 do
-                let bits = Convert.ToString(rand.Next(), 2)
-                let input = String.map (fun c -> if c = '0' then 'a' else 'b') bits
-                let expected = input.Contains "abba"
-                let actual =
-                    exec abba (Seq.map Some input)
-                    |> Set.intersect abba.Accepting
-                    |> Set.isEmpty
-                    |> not
-                Expect.equal actual expected $"Should have halted with {expected} on \"{input}\""
+        ptestCase "Automaton.withOutputAdapter" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.withOutputAdapter`"
 
-        testCase "Implicit dead transitions" <| fun _ ->
-            let message = "Should have transitioned to dead state"
-            let deadEven = { even with Current = even.Dead } :> IAutomaton<_, _, _>
-            let deadAbba = { abba with Current = abba.Dead } :> IAutomaton<_, _, _>
-            Expect.equal (Automaton.step even '?') (deadEven, ()) message
-            Expect.equal (Automaton.step abba (Some '?')) (deadAbba, ()) message
+        ptestCase "Automaton.compose" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.compose`"
 
-        testCase "State set inference" <| fun _ ->
-            let message = "Should have inferred state set"
-            Expect.equal even.States (set [ "dead"; "empty"; "even"; "odd" ]) message
-            Expect.equal abba.States (set [ "$"; "A"; "AB"; "ABB"; "ABBA" ]) message
-            Expect.equal cyclic.States (set [ "A"; "B"; "C" ]) message
+        ptestCase "Automaton.zip" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.zip`"
 
-        testCase "Alphabet inference" <| fun _ ->
-            let message = "Should have inferred input alphabet"
-            Expect.equal even.Alphabet (set [ '0'; '1' ]) message
-            Expect.equal abba.Alphabet (set [ 'a'; 'b' ]) message
-            Expect.equal cyclic.Alphabet (set []) message
+        ptestCase "Automaton.makeProbe" <| fun _ ->
+            Expect.equal true false "TODO: test `Automaton.makeProbe`"
     ]

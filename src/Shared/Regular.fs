@@ -1,6 +1,6 @@
-/// Finite automata and regexp algebra for the domain of regular languages.
+/// Regexp algebra and finite automata for the domain of regular languages.
 
-namespace Formal.Languages
+namespace Formally.Regular
 
 type private Symbol = char
 
@@ -88,11 +88,11 @@ type Regexp =
         let escapingCharacters = @"\()|*.^?"
 
         match this with
-        | Symbol char ->
-            if String.exists ((=) char) escapingCharacters then
-                @"\" + string char
+        | Symbol c ->
+            if String.exists ((=) c) escapingCharacters then
+                @"\" + string c
             else
-                string char
+                string c
         | Alternation set ->
             if Set.isEmpty set then
                 "(.^)" // regex to reject any input, including empty strings
@@ -148,7 +148,34 @@ module Regexp =
     let inline init n (r: Regexp) = Regexp._Pow (r, n)
 
 
-open Formal.Automata
+open Formally.Automata
+
+/// Helpers specifically dealing with finite transition tables aka multigraphs.
+module private Finite =
+    /// Finds, in a nondeterministic transition table, the set of states
+    /// recursively reachable only by epsilon transitions from an initial state
+    /// while applying a state projection function at each transition output.
+    let epsilonClosure getState transitionTable initial =
+        let transitions arc =
+            Map.tryFind arc transitionTable |> Option.defaultValue Set.empty
+
+        // depth-first traversal in a possibly cyclic graph
+        let rec epsilonReachable visited current =
+            if Set.contains current visited then
+                set []
+            else
+                let visited = Set.add current visited
+
+                transitions (current, None)
+                |> Seq.map (getState >> epsilonReachable visited)
+                |> Set.unionMany
+                |> Set.add current
+
+        epsilonReachable Set.empty initial
+
+    /// Converts from nondeterministic to deterministic transition table of sets.
+    let determinize getState transitionTable =
+        failwith "FIXME: implement `determinize`"
 
 /// Deterministic Finite Automaton (DFA) for regular language recognition.
 type Dfa<'State when 'State: comparison> =
@@ -156,6 +183,7 @@ type Dfa<'State when 'State: comparison> =
       Current: 'State
       Accepting: Set<'State>
       Dead: 'State }
+    // set of states and input alphabet are implicitly given
 
     member this.States : Set<'State> =
         Map.toSeq this.Transitions
@@ -170,7 +198,6 @@ type Dfa<'State when 'State: comparison> =
         |> Seq.map (fun ((q, a), q') -> set [ a ])
         |> Set.unionMany
 
-    // Moore style: no output on transitions
     interface IAutomaton<'State, Symbol, unit> with
         override this.View = this.Current
 
@@ -178,15 +205,15 @@ type Dfa<'State when 'State: comparison> =
             let next =
                 Map.tryFind (this.Current, input) this.Transitions
                 |> Option.defaultValue this.Dead
-
-            ({ this with Current = next } :> IAutomaton<_, _, _>), () // upcast
+            // Moore style: no output on transitions
+            (), { this with Current = next } :> IAutomaton<_, _, _>
 
 /// Nondeterministic Finite Automaton (NFA) for regular language recognition.
 type Nfa<'State when 'State: comparison> =
     { Transitions: Map<('State * option<Symbol>), Set<'State>>
       Current: Set<'State>
       Accepting: Set<'State> }
-    member _.Dead : Set<'State> = set []
+    member __.Dead : Set<'State> = set []
 
     member this.States : Set<'State> =
         Map.toSeq this.Transitions
@@ -200,22 +227,80 @@ type Nfa<'State when 'State: comparison> =
         |> Seq.map (fun ((q, a), q') -> a)
         |> Seq.filter Option.isSome
         |> Seq.map Option.get
-        |> set
+        |> Set.ofSeq
 
     interface IAutomaton<Set<'State>, option<Symbol>, unit> with
         override this.View = this.Current
 
         override this.Step input =
+            let defaultOf state =
+                if Option.isNone input then set [ state ] else set []
+
             let nextStates =
                 this.Current
                 |> Seq.map // for each state we're in
                     (fun state ->
                         // transition by the given input
                         Map.tryFind (state, input) this.Transitions
-                        |> Option.defaultValue Set.empty
+                        |> Option.defaultValue (defaultOf state)
                         // then unite the epsilon closures of each next state
-                        |> Seq.map (Automaton.epsilonClosure this.Transitions)
+                        |> Seq.map (Finite.epsilonClosure id this.Transitions)
                         |> Set.unionMany)
                 |> Set.unionMany // then get the union of all that
 
-            ({ this with Current = nextStates } :> IAutomaton<_, _, _>), ()
+            (), { this with Current = nextStates } :> IAutomaton<_, _, _>
+
+/// Operations between NFAs and conversion to/from DFAs and Regexps.
+[<RequireQualifiedAccess>]
+module Nfa =
+    let private map stateMapping nfa =
+        { Transitions =
+              Map.toSeq nfa.Transitions
+              |> Seq.map (fun ((q, a), q') -> (stateMapping q, a), Set.map stateMapping q')
+              |> Map.ofSeq
+          Current = Set.map stateMapping nfa.Current
+          Accepting = Set.map stateMapping nfa.Accepting }
+
+    /// Discriminated union of two NFAs through epsilon transitions.
+    let union a b =
+        let a = map Choice1Of2 a
+        let b = map Choice2Of2 b
+        let newInitial = Set.union a.Current b.Current
+        let newAccepting = Set.union a.Accepting b.Accepting
+
+        { Accepting = newAccepting
+          Current = newInitial
+          Transitions =
+              Seq.append (Map.toSeq a.Transitions) (Map.toSeq b.Transitions)
+              |> Map.ofSeq }
+
+    /// Trivial mapping of deterministic to nondeterministic automaton.
+    let ofDfa (dfa: Dfa<_>) =
+        { Current = set [ dfa.Current ]
+          Accepting = dfa.Accepting
+          Transitions =
+              Map.toSeq dfa.Transitions
+              |> Seq.map (fun ((q, i), q') -> (q, Some i), set [ q' ])
+              |> Map.ofSeq }
+
+    /// Converts an NFA into an equivalent DFA.
+    ///
+    /// This is NOT the inverse of `ofDfa`, since states get wrapped into sets.
+    let toDfa nfa =
+        let determinized = Finite.determinize id nfa.Transitions
+
+        let accepting =
+            Map.toSeq determinized
+            |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
+            |> Set.unionMany
+            |> Set.filter (fun s -> Set.intersect s nfa.Accepting |> (not << Set.isEmpty))
+
+        let initial =
+            nfa.Current
+            |> Seq.map (Finite.epsilonClosure id nfa.Transitions)
+            |> Set.unionMany
+
+        { Transitions = determinized
+          Accepting = accepting
+          Dead = set []
+          Current = initial }
