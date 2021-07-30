@@ -4,77 +4,79 @@ open Elmish
 open Fable.Remoting.Client
 
 open Shared
-
-
-type Model =
-    { RegularDefinitionString: string
-      TokenString: string
-      SimulationString: string
-      SimulatorOutputList: SimulatorOutput list }
-
-type Msg =
-    | SetRegularDefinitionString of string
-    | SetTokenString of string
-    | SetSimulationString of string
-    | GetSimulatorOutput of SimulatorOutput list
-    | AddSimulatorOutput
-    | AddedSimulatorOutput of SimulatorOutput
-
-let simulatorOutputApi =
-    Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<ISimulatorOutputListApi>
-
-let init () : Model * Cmd<Msg> =
-    let model =
-        { RegularDefinitionString = ""
-          TokenString = ""
-          SimulationString = ""
-          SimulatorOutputList = [] }
-
-    let cmd =
-        Cmd.OfAsync.perform simulatorOutputApi.getSimulatorOutputList () GetSimulatorOutput
-
-    model, cmd
-
-let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
-    match msg with
-    | SetRegularDefinitionString value ->
-        { model with
-              RegularDefinitionString = value },
-        Cmd.none
-    | SetTokenString value -> { model with TokenString = value }, Cmd.none
-    | SetSimulationString value -> { model with SimulationString = value }, Cmd.none
-    | GetSimulatorOutput simulatorOutputList ->
-        { model with
-              SimulatorOutputList = simulatorOutputList },
-        Cmd.none
-    | AddSimulatorOutput ->
-        let simulatorOutput = SimulatorOutput.create ("", "", 1)
-
-        let cmd =
-            Cmd.OfAsync.perform simulatorOutputApi.addSimulatorOutput simulatorOutput AddedSimulatorOutput
-
-        { model with
-              RegularDefinitionString = "" },
-        cmd
-    | AddedSimulatorOutput simulatorOutput ->
-        { model with
-              SimulatorOutputList = model.SimulatorOutputList @ [ simulatorOutput ] },
-        Cmd.none
-
 open Feliz
 open Feliz.Bulma
 
 Fable.Core.JsInterop.importAll "./style.css"
 
+
+type Model =
+    { RegularDefinitionText: string
+      TokenText: string
+      SimulationText: string
+      Outputs: Output list }
+
+type Msg =
+    | SetRegularDefinitionText of string
+    | SetTokenText of string
+    | SetSimulationText of string
+    | GetOutput of Output list
+    | DoLexicalAnalysis
+    | FinishedLexicalAnalysis of Output list
+
+let api =
+    Remoting.createApi ()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IApi>
+
+let init () : Model * Cmd<Msg> =
+    let model =
+        { RegularDefinitionText = ""
+          TokenText = ""
+          SimulationText = ""
+          Outputs = [] }
+
+    let cmd =
+        // Cmd.OfAsync.perform api.getOutputs () GetOutput
+        Cmd.none
+
+    model, cmd
+
+let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
+    match msg with
+    | SetRegularDefinitionText value ->
+        { model with 
+            RegularDefinitionText = value }, Cmd.none
+    | SetTokenText value -> 
+        { model with 
+            TokenText = value }, Cmd.none
+    | SetSimulationText value -> 
+        { model with 
+            SimulationText = value }, Cmd.none
+    | GetOutput outputs ->
+        { model with
+              Outputs = outputs }, Cmd.none
+    | DoLexicalAnalysis ->
+        let input = Input.create(model.RegularDefinitionText, model.TokenText, model.SimulationText)
+        let cmd = Cmd.OfAsync.perform api.setInput input FinishedLexicalAnalysis
+        { model with
+            RegularDefinitionText = "Retorno visual pra saber se foi" }, cmd
+    | FinishedLexicalAnalysis outputs->
+        { model with
+              Outputs = outputs }, Cmd.none
+
+
+
+
+
+// View
 let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
             prop.rows 20
-            prop.value model.RegularDefinitionString
+            prop.value model.RegularDefinitionText
             prop.placeholder "Informe as expressões regulares"
-            prop.onChange (fun x -> SetRegularDefinitionString x |> dispatch)
+            prop.onChange (fun x -> SetRegularDefinitionText x |> dispatch)
         ]
     ]
 
@@ -82,9 +84,9 @@ let tokensBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
             prop.rows 20
-            prop.value model.TokenString
+            prop.value model.TokenText
             prop.placeholder "Informe os tokens"
-            prop.onChange (fun x -> SetTokenString x |> dispatch)
+            prop.onChange (fun x -> SetTokenText x |> dispatch)
         ]
     ]
 
@@ -92,9 +94,9 @@ let simulatorBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
             prop.rows 20
-            prop.value model.SimulationString
+            prop.value model.SimulationText
             prop.placeholder "Insira o texto para simulação"
-            prop.onChange (fun x -> SetSimulationString x |> dispatch)
+            prop.onChange (fun x -> SetSimulationText x |> dispatch)
         ]
     ]
 
@@ -108,11 +110,11 @@ let tableOutput (model: Model) (dispatch: Msg -> Unit) =
             ]
         ]
         Html.tbody [
-            for simulatorOutput in model.SimulatorOutputList do
+            for output in model.Outputs do
                 Html.tr [
-                    Html.td simulatorOutput.Token
-                    Html.td simulatorOutput.Lexema
-                    Html.td simulatorOutput.Posicao
+                    Html.td output.Token
+                    Html.td output.Lexema
+                    Html.td output.Posicao
                 ]
         ]
     ]
@@ -160,6 +162,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         Bulma.button.a [
                             color.isDark
                             prop.text "Analisador Léxico"
+                            prop.onClick (fun _ -> dispatch DoLexicalAnalysis)
                         ]
                         tableOutput model dispatch
                     ]

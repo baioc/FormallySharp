@@ -7,40 +7,60 @@ open Saturn
 open Shared
 
 type Storage() =
-    let simulatorOutputList = ResizeArray<_>()
+    let outputs = ResizeArray<_>()
 
-    member __.GetSimulatorOutputList() = List.ofSeq simulatorOutputList
+    let mutable input = Input.create("","","")
 
-    member __.AddSimulatorOutput(simulatorOutput: SimulatorOutput) =
-        simulatorOutputList.Add simulatorOutput
+    member __.GetOutputs() = 
+        List.ofSeq outputs
+
+    member __.AddOutput(output: Output) =
+        outputs.Add output
+        Ok()
+
+    member __.SetInput(input1: Input) = 
+        input <- input1
         Ok()
 
 
 let storage = Storage()
 
-storage.AddSimulatorOutput(SimulatorOutput.create ("a", "a", 1))
+storage.AddOutput(Output.create ("a", "a", 1))
 |> ignore
 
-storage.AddSimulatorOutput(SimulatorOutput.create ("b", "b", 2))
+storage.AddOutput(Output.create ("b", "b", 2))
 |> ignore
 
-storage.AddSimulatorOutput(SimulatorOutput.create ("c", "c", 3))
+storage.AddOutput(Output.create ("c", "c", 3))
 |> ignore
 
-let simulatorOutputApi =
-    { getSimulatorOutputList = fun () -> async { return storage.GetSimulatorOutputList() }
-      addSimulatorOutput =
-          fun simulatorOutput ->
-              async {
-                  match storage.AddSimulatorOutput simulatorOutput with
-                  | Ok () -> return simulatorOutput
-                  | Error e -> return failwith e
-              } }
+let api =
+    { getOutputs = 
+            fun () -> 
+                async { 
+                    return storage.GetOutputs() 
+                }
+
+      addOutput =
+            fun output ->
+                async {
+                    match storage.AddOutput output with
+                    | Ok () -> return output
+                    | Error e -> return failwith e
+                } 
+
+      setInput = 
+            fun input ->
+                async {
+                    storage.SetInput(input)
+                    return storage.GetOutputs() 
+                }
+    }
 
 let webApp =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue simulatorOutputApi
+    |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
 
 let app =

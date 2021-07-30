@@ -2,12 +2,23 @@ namespace Shared
 
 open System
 
-type SimulatorOutput =
+type Input = 
+    { RegularDefinition: String
+      Token: String
+      Simulation: String }
+
+module Input =
+    let create (regularDefinition: String, token: String, simulation: string) = 
+        { RegularDefinition = regularDefinition
+          Token = token
+          Simulation = simulation }
+
+type Output =
     { Token: String
       Lexema: String
       Posicao: int }
 
-module SimulatorOutput =
+module Output =
     let create (token: String, lexema: String, posicao: int) =
         { Token = token
           Lexema = lexema
@@ -17,6 +28,7 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-type ISimulatorOutputListApi =
-    { getSimulatorOutputList: unit -> Async<SimulatorOutput list>
-      addSimulatorOutput: SimulatorOutput -> Async<SimulatorOutput> }
+type IApi =
+    { getOutputs: unit -> Async<Output list>
+      addOutput: Output -> Async<Output> 
+      setInput: Input -> Async<Output list> }
