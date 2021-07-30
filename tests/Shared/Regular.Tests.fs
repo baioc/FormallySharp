@@ -237,14 +237,14 @@ module Nfa =
             Expect.equal (Automaton.step '?' even) ((), deadEven) message
             Expect.equal (Automaton.step (Some '?') abba) ((), deadAbba) message
 
-        testCase "Epsilon closures" <| fun _ ->
+        testCase "Epsilon transitions" <| fun _ ->
             let abbaEps = Automaton.step None abba |> snd |> Automaton.view
             let cyclicEps = Automaton.step None cyclic |> snd |> Automaton.view
             Expect.equal abbaEps (set [ "$" ]) "Closure from a state should contain itself"
             Expect.equal cyclicEps (set [ 'A'; 'B'; 'C' ]) "Should work with cyclic closures"
 
-        ptestCase "NFA discriminated union" <| fun _ ->
-            Expect.equal true false "TODO: test `Nfa.union`"
+        ptestCase "NFA union" <| fun _ ->
+            Expect.equal true false "TODO: test `Nfa.union` + `Nfa.map`"
 
         testCase "DFA indeterminization" <| fun _ ->
             let nondetEven =

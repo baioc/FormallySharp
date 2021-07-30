@@ -40,7 +40,7 @@ module Automaton =
                 yield! trace rest next
             }
 
-    // triple adapter combinator, for internal usage only
+    // triple adapter combinator
     let rec private withAdapters viewAdapter inputAdapter outputAdapter automaton =
         { new IAutomaton<_, _, _> with
             member __.View = view automaton |> viewAdapter

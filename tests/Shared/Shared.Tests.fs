@@ -11,15 +11,17 @@ open Shared
 
 [<RequireQualifiedAccess>]
 module Shared =
-    open Formally.Automata
-    open Formally.Regular
+    open Formally.Automata.Tests
+    open Formally.Regular.Tests
 
     let tests = testList "Shared" [
-        Tests.Automaton.tests
-        Tests.Regexp.tests
-        Tests.Nfa.tests
+        // internal libraries
+        Automaton.tests
+        Regexp.tests
+        Nfa.tests
 
-        testList "Misc" [
+        // shared business logic
+        testList "Domain Modeling" [
             testCase "Empty string is not a valid description" <| fun _ ->
                 let expected = false
                 let actual = Todo.isValid ""

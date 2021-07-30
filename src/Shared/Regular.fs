@@ -2,12 +2,14 @@
 
 namespace Formally.Regular
 
+// just a local alias to improve readability
 type private Symbol = char
 
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
 type Regexp =
-    private
+    // these union cases are only exposed for consuming regexps, construction
+    // should be done with the algebraic operators or module functions
     | Symbol of Symbol
     | Alternation of Set<Regexp>
     | Concatenation of Regexp list
@@ -151,7 +153,8 @@ module Regexp =
 open Formally.Automata
 
 /// Helpers specifically dealing with finite transition tables aka multigraphs.
-module private Finite =
+[<System.Runtime.CompilerServices.Extension>]
+module Automaton =
     /// Finds, in a nondeterministic transition table, the set of states
     /// recursively reachable only by epsilon transitions from an initial state
     /// while applying a state projection function at each transition output.
@@ -195,8 +198,8 @@ type Dfa<'State when 'State: comparison> =
 
     member this.Alphabet : Set<Symbol> =
         Map.toSeq this.Transitions
-        |> Seq.map (fun ((q, a), q') -> set [ a ])
-        |> Set.unionMany
+        |> Seq.map (fun ((q, a), q') -> a)
+        |> Set.ofSeq
 
     interface IAutomaton<'State, Symbol, unit> with
         override this.View = this.Current
@@ -244,7 +247,7 @@ type Nfa<'State when 'State: comparison> =
                         Map.tryFind (state, input) this.Transitions
                         |> Option.defaultValue (defaultOf state)
                         // then unite the epsilon closures of each next state
-                        |> Seq.map (Finite.epsilonClosure id this.Transitions)
+                        |> Seq.map (Automaton.epsilonClosure id this.Transitions)
                         |> Set.unionMany)
                 |> Set.unionMany // then get the union of all that
 
@@ -253,7 +256,8 @@ type Nfa<'State when 'State: comparison> =
 /// Operations between NFAs and conversion to/from DFAs and Regexps.
 [<RequireQualifiedAccess>]
 module Nfa =
-    let private map stateMapping nfa =
+    /// Transforms an NFA by applying a function over all of its states.
+    let map stateMapping nfa =
         { Transitions =
               Map.toSeq nfa.Transitions
               |> Seq.map (fun ((q, a), q') -> (stateMapping q, a), Set.map stateMapping q')
@@ -263,13 +267,13 @@ module Nfa =
 
     /// Discriminated union of two NFAs through epsilon transitions.
     let union a b =
+        // we need to discriminate states from each NFA in order to maintain their structures,
+        // which would otherwise be lost when building the transition table below
         let a = map Choice1Of2 a
         let b = map Choice2Of2 b
-        let newInitial = Set.union a.Current b.Current
-        let newAccepting = Set.union a.Accepting b.Accepting
 
-        { Accepting = newAccepting
-          Current = newInitial
+        { Accepting = Set.union a.Accepting b.Accepting
+          Current = Set.union a.Current b.Current
           Transitions =
               Seq.append (Map.toSeq a.Transitions) (Map.toSeq b.Transitions)
               |> Map.ofSeq }
@@ -287,20 +291,17 @@ module Nfa =
     ///
     /// This is NOT the inverse of `ofDfa`, since states get wrapped into sets.
     let toDfa nfa =
-        let determinized = Finite.determinize id nfa.Transitions
+        // determinize the entire transition table
+        let determinized = Automaton.determinize id nfa.Transitions
 
+        // accepting states are any that intersect with the initial accepting set
         let accepting =
             Map.toSeq determinized
             |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
             |> Set.unionMany
-            |> Set.filter (fun s -> Set.intersect s nfa.Accepting |> (not << Set.isEmpty))
+            |> Set.filter (fun state -> Set.intersect state nfa.Accepting <> set [])
 
-        let initial =
-            nfa.Current
-            |> Seq.map (Finite.epsilonClosure id nfa.Transitions)
-            |> Set.unionMany
-
-        { Transitions = determinized
-          Accepting = accepting
-          Dead = set []
-          Current = initial }
+        { Dead = set []
+          Current = nfa.Current
+          Transitions = determinized
+          Accepting = accepting }
