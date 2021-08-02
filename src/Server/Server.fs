@@ -9,37 +9,60 @@ open Shared
 
 
 type Storage() =
-    let todos = ResizeArray<_>()
+    let outputs = ResizeArray<_>()
 
-    member __.GetTodos() = List.ofSeq todos
+    let mutable input = Input.create("","","")
 
-    member __.AddTodo(todo: Todo) =
-        if Todo.isValid todo.Description then
-            todos.Add todo
-            Ok()
-        else
-            Error "Invalid todo"
+    member __.GetOutputs() = 
+        List.ofSeq outputs
+
+    member __.AddOutput(output: Output) =
+        outputs.Add output
+        Ok()
+
+    member __.SetInput(input1: Input) = 
+        input <- input1
+        Ok()
+
 
 let storage = Storage()
 
-storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
-storage.AddTodo(Todo.create "Write your app") |> ignore
-storage.AddTodo(Todo.create "Ship it !!!") |> ignore
+storage.AddOutput(Output.create ("a", "a", 1))
+|> ignore
 
-let todosProtocol =
-    { getTodos = fun () -> async { return storage.GetTodos() }
-      addTodo =
-          fun todo ->
-              async {
-                  match storage.AddTodo todo with
-                  | Ok () -> return todo
-                  | Error e -> return failwith e
-              } }
+storage.AddOutput(Output.create ("b", "b", 2))
+|> ignore
+
+storage.AddOutput(Output.create ("c", "c", 3))
+|> ignore
+
+let api =
+    { getOutputs = 
+            fun () -> 
+                async { 
+                    return storage.GetOutputs() 
+                }
+
+      addOutput =
+            fun output ->
+                async {
+                    match storage.AddOutput output with
+                    | Ok () -> return output
+                    | Error e -> return failwith e
+                } 
+
+      setInput = 
+            fun input ->
+                async {
+                    storage.SetInput(input)
+                    return storage.GetOutputs() 
+                }
+    }
 
 let todosApi =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue todosProtocol
+    |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
 
 

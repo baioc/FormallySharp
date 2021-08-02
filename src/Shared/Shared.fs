@@ -9,16 +9,33 @@ module Route =
 
 open System
 
-type Todo = { Id: Guid; Description: string }
+type Input = 
+    { RegularDefinition: String
+      Token: String
+      Simulation: String }
 
-type ITodosApi =
-    { getTodos: unit -> Async<Todo list>
-      addTodo: Todo -> Async<Todo> }
+module Input =
+    let create (regularDefinition: String, token: String, simulation: string) = 
+        { RegularDefinition = regularDefinition
+          Token = token
+          Simulation = simulation }
 
-module Todo =
-    let isValid (description: string) =
-        String.IsNullOrWhiteSpace description |> not
+type Output =
+    { Token: String
+      Lexema: String
+      Posicao: int }
 
-    let create (description: string) =
-        { Id = Guid.NewGuid()
-          Description = description }
+module Output =
+    let create (token: String, lexema: String, posicao: int) =
+        { Token = token
+          Lexema = lexema
+          Posicao = posicao }
+
+module Route =
+    let builder typeName methodName =
+        sprintf "/api/%s/%s" typeName methodName
+
+type IApi =
+    { getOutputs: unit -> Async<Output list>
+      addOutput: Output -> Async<Output> 
+      setInput: Input -> Async<Output list> }
