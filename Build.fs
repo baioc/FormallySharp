@@ -17,7 +17,14 @@ let clientTestsPath = Path.getFullName "tests/Client"
 
 Target.create "Clean" (fun _ ->
     Shell.cleanDir deployPath
-    run dotnet "fable clean --yes" clientPath // Delete *.fs.js files created by Fable
+    [ "Clean Fable", dotnet "fable clean --yes" "." // Delete *.fs.js files created by Fable
+      $"Clean {sharedPath}", dotnet "clean" sharedPath
+      $"Clean {serverPath}", dotnet "clean" serverPath
+      $"Clean {clientPath}", dotnet "clean" clientPath
+      $"Clean {sharedTestsPath}", dotnet "clean" sharedTestsPath
+      $"Clean {serverTestsPath}", dotnet "clean" serverTestsPath
+      $"Clean {clientTestsPath}", dotnet "clean" clientTestsPath ]
+    |> runParallel
 )
 
 Target.create "InstallClient" (fun _ -> run npm "install" ".")
@@ -50,7 +57,7 @@ Target.create "Run" (fun _ ->
     |> runParallel
 )
 
-Target.create "RunTests" (fun _ ->
+Target.create "Tests" (fun _ ->
     run dotnet "build" sharedTestsPath
     [ "server", dotnet "watch run" serverTestsPath
       "client", dotnet "fable watch --run webpack-dev-server --config ../../webpack.tests.config.js" clientTestsPath ]
@@ -64,17 +71,15 @@ Target.create "Format" (fun _ ->
 open Fake.Core.TargetOperators
 
 let dependencies = [
-    "Clean"
-        ==> "InstallClient"
+    "InstallClient"
         ==> "Bundle"
         ==> "Azure"
 
-    "Clean"
-        ==> "InstallClient"
+    "InstallClient"
         ==> "Run"
 
     "InstallClient"
-        ==> "RunTests"
+        ==> "Tests"
 ]
 
 [<EntryPoint>]

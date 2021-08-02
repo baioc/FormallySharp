@@ -16,8 +16,7 @@ var CONFIG = {
     indexHtmlTemplate: 'tests/Client/index.html',
     fsharpEntry: 'tests/Client/Client.Tests.fs.js',
     assetsDir: 'tests/Client',
-    outputDir: 'tests/Client',
-    devServerPort: 8081,
+    devServerPort: 8008,
     // When using webpack-dev-server, you may need to redirect some calls
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
     devServerProxy: undefined,

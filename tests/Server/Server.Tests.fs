@@ -2,8 +2,9 @@ module Server.Tests
 
 open Expecto
 
-open Shared
 open Server
+open Shared
+open Shared.Tests
 
 let server = testList "Server" [
     testCase "Adding valid Todo" <| fun _ ->
@@ -17,12 +18,11 @@ let server = testList "Server" [
         Expect.contains (storage.GetTodos()) validTodo "Storage should contain new todo"
 ]
 
-let all =
-    testList "All"
-        [
-            Shared.Tests.shared
-            server
-        ]
+
+let all =  testList "All" [
+    Shared.tests
+    server
+]
 
 [<EntryPoint>]
-let main _ = runTests defaultConfig all
+let main _ = runTests { defaultConfig with verbosity = Logging.Debug } all

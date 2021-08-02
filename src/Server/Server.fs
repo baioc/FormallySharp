@@ -3,8 +3,10 @@ module Server
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Saturn
+open Giraffe
 
 open Shared
+
 
 type Storage() =
     let outputs = ResizeArray<_>()
@@ -57,19 +59,22 @@ let api =
                 }
     }
 
-let webApp =
+let todosApi =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
 
+
+let api = choose [ todosApi ]
+
 let app =
     application {
         url "http://0.0.0.0:8085"
-        use_router webApp
-        memory_cache
         use_static "public"
+        use_router api
         use_gzip
+        memory_cache
     }
 
 run app

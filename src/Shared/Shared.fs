@@ -1,4 +1,11 @@
+/// Miscellaneous stuff that is used by both Client and Server
 namespace Shared
+
+
+// defines all API endpoints
+module Route =
+    let builder typeName methodName = $"/api/{typeName}/{methodName}"
+
 
 open System
 
