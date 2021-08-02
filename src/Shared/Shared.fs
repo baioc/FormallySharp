@@ -31,10 +31,6 @@ module Output =
           Lexema = lexema
           Posicao = posicao }
 
-module Route =
-    let builder typeName methodName =
-        sprintf "/api/%s/%s" typeName methodName
-
 type IApi =
     { getOutputs: unit -> Async<Output list>
       addOutput: Output -> Async<Output> 

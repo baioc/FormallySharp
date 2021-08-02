@@ -59,20 +59,17 @@ let api =
                 }
     }
 
-let todosApi =
+let webApp =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
 
-
-let api = choose [ todosApi ]
-
 let app =
     application {
         url "http://0.0.0.0:8085"
         use_static "public"
-        use_router api
+        use_router webApp
         use_gzip
         memory_cache
     }
