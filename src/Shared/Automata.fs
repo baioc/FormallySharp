@@ -69,7 +69,7 @@ module Automaton =
 
             member __.View = view inner, view outer }
 
-    /// Combines two automata in synchronous parallelism.
+    /// Combines two automata in synchronous "parallelism".
     let rec zip a b =
         { new IAutomaton<_, _, _> with
             member __.Step input =
@@ -80,8 +80,10 @@ module Automaton =
 
             member __.View = view a, view b }
 
-    /// Makes a probe machine that simply pipes all input to its output.
-    let rec makeProbe initialValue =
+    /// Wraps a folding function + initial state into an observable machine.
+    let rec fold folder state =
         { new IAutomaton<_, _, _> with
-            member __.View = initialValue
-            member __.Step x = x, (makeProbe x) }
+            member __.View = state
+            member __.Step input =
+                let next = folder state input
+                next, (fold folder next) }

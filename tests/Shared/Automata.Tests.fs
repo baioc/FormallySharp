@@ -32,32 +32,67 @@ module Extensions =
                 Expect.equal (Automaton.exec inputs automaton) expected
                     "Should have reached the expected state"
 
+
 module Automaton =
+    // mutable single-step Fibonacci automaton
+    type Fibonacci(f0, f1) =
+        let mutable current: bigint = f0
+        let mutable previous: bigint = f1 - f0
+        new() = Fibonacci(0I, 1I)
+        interface IAutomaton<bigint, unit, bigint> with
+            override __.View = current
+            override this.Step _ =
+                let next = previous + current
+                previous <- current
+                current <- next
+                next, this :> IAutomaton<_, _, _>
+
+    // functional counter automaton
+    let inline sumFrom initial = Automaton.fold (+) initial
+
     let tests = testList "Automata" [
-        ptestCase "Automaton.step" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.step`"
+        testCase "Functional style" <| fun _ ->
+            let fromZero = sumFrom 0I
+            let _, fromOne = (1I, fromZero) ||> Automaton.step
+            Expect.equal (Automaton.view fromZero) 0I "Should have maintained original state"
+            Expect.equal (Automaton.view fromOne) 1I "Should have been incremented by 1"
 
-        ptestCase "Automaton.view" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.view`"
+        testCase "Mutable style" <| fun _ ->
+            let fib0 = Fibonacci()
+            Expect.equal (Automaton.view fib0) 0I "Should have been equal"
+            let _, fib5 =
+                Automaton.withOutputAdapter ignore fib0
+                |> Automaton.step ()
+                ||> Automaton.step
+                ||> Automaton.step
+                ||> Automaton.step
+                ||> Automaton.step
+            Expect.equal (Automaton.view fib5) 5I "Should have been equal"
+            Expect.equal (Automaton.view fib0) 5I "Should have been mutated"
 
-        ptestCase "Automaton.trace" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.trace`"
+        testCase "Parallel combination" <| fun _ ->
+            let zipped =
+                Automaton.zip (sumFrom 0) (Fibonacci())
+                |> Automaton.withInputAdapter (fun () -> 1, ())
+                |> Automaton.withOutputAdapter ignore
+            let fibs =
+                zipped
+                |> Automaton.trace (Seq.initInfinite ignore)
+                |> Seq.map (fun ((a, i), (b, o)) -> a)
+            let fib16 = Seq.item 16 fibs
+            Expect.equal fib16 (16, 987I) "Should have been equal"
 
-        ptestCase "Automaton.withViewAdapter" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.withViewAdapter`"
-
-        ptestCase "Automaton.withInputAdapter" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.withInputAdapter`"
-
-        ptestCase "Automaton.withOutputAdapter" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.withOutputAdapter`"
-
-        ptestCase "Automaton.compose" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.compose`"
-
-        ptestCase "Automaton.zip" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.zip`"
-
-        ptestCase "Automaton.makeProbe" <| fun _ ->
-            Expect.equal true false "TODO: test `Automaton.makeProbe`"
+        testCase "Sequential composition" <| fun _ ->
+            let delta = 1
+            let initial = 1
+            let mutable series =
+                Automaton.fold (fun previous () -> previous + delta) initial
+                |> Automaton.compose (sumFrom initial)
+                |> Automaton.withViewAdapter (fun (term, partialSum) -> partialSum)
+            for n in 1 .. 100 do
+                let nthTerm = initial + delta*(n - 1)
+                let expected = n * (initial + nthTerm) / 2
+                Expect.equal (Automaton.view series) expected "Should have been equal"
+                let _, next = Automaton.step () series
+                series <- next
     ]
