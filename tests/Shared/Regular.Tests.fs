@@ -128,9 +128,9 @@ module Regexp =
             randomRegexps()
             |> Seq.iter
                 (fun r ->
-                    Expect.equal (Regexp._Pow(r, 0)) Regexp.One "For all r, (r**0) should be equal to (1)"
-                    Expect.equal (Regexp._Pow(r, 1)) r "For all r, (r**1) should be equal to (r)"
-                    Expect.equal (Regexp._Pow(r, 2)) (r * r) "For all r, (r**2) should be equal to (r * r)")
+                    Expect.equal (r ** 0) Regexp.One "For all r, (r**0) should be equal to (1)"
+                    Expect.equal (r ** 1) r "For all r, (r**1) should be equal to (r)"
+                    Expect.equal (r ** 2) (r * r) "For all r, (r**2) should be equal to (r * r)")
 
         testCase "Non-algebraic names" <| fun _ ->
             Expect.equal Regexp.none Regexp.Zero "none should be an alias of Zero"
@@ -145,7 +145,7 @@ module Regexp =
                     Expect.equal (Regexp.star a) (!* a) "star should be an alias of (!*)"
                     Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
                     Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
-                    Expect.equal (Regexp.init 3 a) (Regexp._Pow(a, 3)) "init should be an alterantive for (**)")
+                    Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)")
     ]
 
 

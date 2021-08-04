@@ -78,9 +78,7 @@ type Regexp =
     static member (!+)(r: Regexp) = r * !*r
 
     /// Repetition: fixed number of repetitions of a regexp in sequence.
-    // XXX: the ugly (but grep-able) name disables using the ( ** ) operator,
-    // which triggers a bug in Fable: https://github.com/fable-compiler/Fable/issues/2496
-    static member _Pow(r: Regexp, n: int) =
+    static member Pow(r: Regexp, n: int) =
         if n <= 0 then Regexp.One
         elif n = 1 then r
         else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
@@ -147,7 +145,7 @@ module Regexp =
     let inline many (r: Regexp) = !+r
 
     /// Alternative for (**)
-    let inline init n (r: Regexp) = Regexp._Pow (r, n)
+    let inline init n (r: Regexp) = r ** n
 
 
 open Formally.Automata
