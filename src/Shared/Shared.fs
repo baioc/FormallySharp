@@ -8,6 +8,7 @@ module Route =
 
 
 open System
+open Formally.Regular
 
 type Input = 
     { RegularDefinition: string
@@ -35,6 +36,6 @@ type IApi =
     { getOutputs: unit -> Async<Output list>
       addOutput: Output -> Async<Output> 
       setInput: Input -> Async<Output list>
-      // getRegularDefinitions: unit -> string list
-      // addRegularDefinition: string -> string 
+      getRegularDefinitionsMap: unit -> Async<Map<string,Regexp>>
+      putRegularDefinition: string * Regexp -> Async<unit>
     }

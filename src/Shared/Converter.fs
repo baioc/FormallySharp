@@ -9,10 +9,20 @@ open Formally.Regular
 //     |> Remoting.buildProxy<IApi>
 
 module Converter = 
-    let convertRegularDefinitionTextToRegexp(regularDefinition: string) = 
-        Ok()
-        // for c in regularDefinition do
-        //     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
-        //         api.addRegularDefinition(c)
-
-            
+    let convertRegularDefinitionTextToRegexp(regularDefinitionsText: string) = 
+        let mutable key = ""
+        let mutable value = ""
+        let mutable insertKey = true
+        let regularExpressions = ResizeArray<char>()
+        let regularDefinitionsTextWithoutSpaces = System.String.Concat(regularDefinitionsText.Split(' '))
+        let regularDefinitions = List.ofArray(regularDefinitionsTextWithoutSpaces.Split('\n'))
+        for regularDefinition in regularDefinitions do 
+            let text = List.ofArray(regularDefinition.Split(':'))
+            key <- text.Head // key = "L"
+            for word in text do
+                if (word <> text.Head) then
+                    let regularExpression = System.String.Concat(System.String.Concat(word.Split('[')).Split(']')) //regularExpression = A-Za-z
+                    for i = 0 to regularExpression.Length do 
+                        regularExpressions.Add regularExpression.[i]
+                        Ok()
+                        |> ignore

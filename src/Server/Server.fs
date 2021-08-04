@@ -14,8 +14,6 @@ type Storage() =
 
     let mutable input = Input.create("","","")
 
-    // let mutable regularDefinitions = ResizeArray<string>()
-
     let mutable regularDefinitionsMap = Map.empty
 
     member __.GetOutputs() = 
@@ -31,13 +29,6 @@ type Storage() =
     member __.SetInput(input1: Input) = 
         input <- input1
         Ok()
-
-    // member __.GetRegularDefinitions() = 
-    //     List.ofSeq regularDefinitions
-
-    // member __.AddRegularDefinition(regularDefinition: string) =
-    //     regularDefinitions.Add regularDefinition
-    //     Ok()
 
     member __.GetRegularDefinitionsMap() =
         regularDefinitionsMap
@@ -75,19 +66,22 @@ let api =
       setInput = 
             fun input ->
                 async {
-                    storage.SetInput(input)
+                    storage.SetInput(input) |> ignore
                     Converter.convertRegularDefinitionTextToRegexp(input.RegularDefinition)
                     return storage.GetOutputs() 
                 }
 
-    //   getRegularDefinitions = 
-    //         fun () ->
-    //             storage.GetRegularDefinitions() 
+      getRegularDefinitionsMap = 
+            fun () ->
+                async {
+                    return storage.GetRegularDefinitionsMap()
+                }
 
-    //   addRegularDefinition =
-    //         fun regularDefinition ->
-    //             match storage.AddRegularDefinition regularDefinition with
-    //             | Ok () -> regularDefinition
+      putRegularDefinition = 
+            fun (regularDefinition, regex) ->
+                async {
+                    return storage.PutRegularDefinition(regularDefinition, regex)
+                }
     }
 
 let webApp =
