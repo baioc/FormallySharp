@@ -16,7 +16,7 @@ type Storage() =
 
     // let mutable regularDefinitions = ResizeArray<string>()
 
-    let mutable regularDefinitionsMap = Map<string,Regexp>
+    let mutable regularDefinitionsMap = Map.empty
 
     member __.GetOutputs() = 
         List.ofSeq outputs
