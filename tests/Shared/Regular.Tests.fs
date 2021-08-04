@@ -162,38 +162,35 @@ module Nfa =
         { Dead = -1
           Accepting = set [ 2 ]
           Current = 0
-          Transitions = map [
-              (0, '0') => 2
-              (0, '1') => 1
-              (2, '0') => 2
-              (2, '1') => 1
-              (1, '0') => 2
-              (1, '1') => 1
-        ] }
+          Transitions =
+              map [ (0, '0') => 2
+                    (0, '1') => 1
+                    (2, '0') => 2
+                    (2, '1') => 1
+                    (1, '0') => 2
+                    (1, '1') => 1 ] }
 
     // NFA over {a,b} that accepts strings containing "abba" as a substring
     let abba =
         { Current = set [ "$" ]
           Accepting = set [ "ABBA" ]
-          Transitions = map [
-              ("$",    Some 'a') => set [ "$"; "A" ]
-              ("$",    Some 'b') => set [ "$" ]
-              ("A",    Some 'b') => set [ "AB" ]
-              ("AB",   Some 'b') => set [ "ABB" ]
-              ("ABB",  Some 'a') => set [ "ABBA" ]
-              ("ABBA", Some 'a') => set [ "ABBA" ]
-              ("ABBA", Some 'b') => set [ "ABBA" ]
-        ] }
+          Transitions =
+              map [ ("$",    Some 'a') => set [ "$"; "A" ]
+                    ("$",    Some 'b') => set [ "$" ]
+                    ("A",    Some 'b') => set [ "AB" ]
+                    ("AB",   Some 'b') => set [ "ABB" ]
+                    ("ABB",  Some 'a') => set [ "ABBA" ]
+                    ("ABBA", Some 'a') => set [ "ABBA" ]
+                    ("ABBA", Some 'b') => set [ "ABBA" ] ] }
 
     // NFA with cyclic and reflexive epsilon transitions. rejects all input
     let cyclic =
         { Current = set [ 'A' ]
           Accepting = set []
-          Transitions = map [
-              ('A', None) => set [ 'A'; 'B'; 'C' ]
-              ('B', None) => set []
-              ('C', None) => set [ 'B'; 'A' ]
-        ] }
+          Transitions =
+              map [ ('A', None) => set [ 'A'; 'B'; 'C' ]
+                    ('B', None) => set []
+                    ('C', None) => set [ 'B'; 'A' ] ] }
 
     let tests = testList "Finite Automata" [
         testCase "State set inference" <| fun _ ->
@@ -241,22 +238,79 @@ module Nfa =
             Expect.equal abbaEps (set [ "$" ]) "Closure from a state should contain itself"
             Expect.equal cyclicEps (set [ 'A'; 'B'; 'C' ]) "Should work with cyclic closures"
 
-        ptestCase "NFA union" <| fun _ ->
-            Expect.equal true false "TODO: test `Nfa.union` + `Nfa.map`"
-
         testCase "DFA indeterminization" <| fun _ ->
             let nondetEven =
                 { Current = set [ 0 ]
                   Accepting = set [ 2 ]
                   Transitions =
-                    map [ (0, Some '0') => set [ 2 ]
-                          (0, Some '1') => set [ 1 ]
-                          (2, Some '0') => set [ 2 ]
-                          (2, Some '1') => set [ 1 ]
-                          (1, Some '0') => set [ 2 ]
-                          (1, Some '1') => set [ 1 ] ] }
+                      map [ (0, Some '0') => set [ 2 ]
+                            (0, Some '1') => set [ 1 ]
+                            (2, Some '0') => set [ 2 ]
+                            (2, Some '1') => set [ 1 ]
+                            (1, Some '0') => set [ 2 ]
+                            (1, Some '1') => set [ 1 ] ] }
             Expect.equal (Nfa.ofDfa even) nondetEven "Should have been a trivial conversion"
 
-        ptestCase "NFA determinization" <| fun _ ->
-            Expect.equal true false "TODO: test `Nfa.toDfa`"
+        testCase "NFA union" <| fun _ ->
+            let evenOrAbba =
+                { Current = set [ "0"; "$" ]
+                  Accepting = set [ "2"; "ABBA" ]
+                  Transitions =
+                      map [ ("0",    Some '0') => set [ "2" ]
+                            ("0",    Some '1') => set [ "1" ]
+                            ("2",    Some '0') => set [ "2" ]
+                            ("2",    Some '1') => set [ "1" ]
+                            ("1",    Some '0') => set [ "2" ]
+                            ("1",    Some '1') => set [ "1" ]
+                            ("$",    Some 'a') => set [ "$"; "A" ]
+                            ("$",    Some 'b') => set [ "$" ]
+                            ("A",    Some 'b') => set [ "AB" ]
+                            ("AB",   Some 'b') => set [ "ABB" ]
+                            ("ABB",  Some 'a') => set [ "ABBA" ]
+                            ("ABBA", Some 'a') => set [ "ABBA" ]
+                            ("ABBA", Some 'b') => set [ "ABBA" ] ] }
+            let even = Nfa.ofDfa even
+            let discriminated = Nfa.union even abba
+            let unified =
+                discriminated
+                |> Nfa.map (function // no name conflicts -> this is safe
+                            | Choice1Of2 i -> string i
+                            | Choice2Of2 s -> s)
+            Expect.equal unified evenOrAbba "Should have preserved individual structure"
+
+        testCase "NFA determinization" <| fun _ ->
+            let detAbba =
+                { Dead = set []
+                  Current = set [ "$" ]
+                  Accepting =
+                      set [ set [ "ABBA" ]
+                            set [ "$"; "A"; "ABBA" ]
+                            set [ "$"; "AB"; "ABBA" ]
+                            set [ "$"; "ABB"; "ABBA" ]
+                            set [ "$"; "ABBA" ] ]
+                  Transitions =
+                      map [ // original states
+                            (set [ "$" ],    'a') => set [ "$"; "A" ]
+                            (set [ "$" ],    'b') => set [ "$" ]
+                            (set [ "A" ],    'b') => set [ "AB" ]
+                            (set [ "AB" ],   'b') => set [ "ABB" ]
+                            (set [ "ABB" ],  'a') => set [ "ABBA" ]
+                            (set [ "ABBA" ], 'a') => set [ "ABBA" ]
+                            (set [ "ABBA" ], 'b') => set [ "ABBA" ]
+                            // combined states
+                            (set [ "$"; "A" ],           'a') => set [ "$"; "A" ]
+                            (set [ "$"; "A" ],           'b') => set [ "$"; "AB" ]
+                            (set [ "$"; "AB" ],          'a') => set [ "$"; "A" ]
+                            (set [ "$"; "AB" ],          'b') => set [ "$"; "ABB" ]
+                            (set [ "$"; "ABB" ],         'a') => set [ "$"; "A"; "ABBA" ]
+                            (set [ "$"; "ABB" ],         'b') => set [ "$" ]
+                            (set [ "$"; "A"; "ABBA" ],   'a') => set [ "$"; "A"; "ABBA" ]
+                            (set [ "$"; "A"; "ABBA" ],   'b') => set [ "$"; "AB"; "ABBA" ]
+                            (set [ "$"; "AB"; "ABBA" ],  'a') => set [ "$"; "A"; "ABBA" ]
+                            (set [ "$"; "AB"; "ABBA" ],  'b') => set [ "$"; "ABB"; "ABBA" ]
+                            (set [ "$"; "ABB"; "ABBA" ], 'a') => set [ "$"; "A"; "ABBA" ]
+                            (set [ "$"; "ABB"; "ABBA" ], 'b') => set [ "$"; "ABBA" ]
+                            (set [ "$"; "ABBA" ],        'a') => set [ "$"; "A"; "ABBA" ]
+                            (set [ "$"; "ABBA" ],        'b') => set [ "$"; "ABBA" ] ] }
+            Expect.equal (Nfa.toDfa abba) detAbba "Should have been fully determinized"
     ]
