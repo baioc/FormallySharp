@@ -1,5 +1,6 @@
 namespace Formally.Converter
 
+// open Fable.Remoting.Client
 open Shared
 open Formally.Regular
 
@@ -11,9 +12,8 @@ open Formally.Regular
 module Converter = 
     let convertRegularDefinitionTextToRegexp(regularDefinitionsText: string) = 
         let mutable key = ""
-        let mutable value = ""
-        let mutable insertKey = true
-        let regularExpressions = ResizeArray<char>()
+        let mutable value = Regexp.empty
+        let regularExpressions = ResizeArray<Regexp>()
         let regularDefinitionsTextWithoutSpaces = System.String.Concat(regularDefinitionsText.Split(' '))
         let regularDefinitions = List.ofArray(regularDefinitionsTextWithoutSpaces.Split('\n'))
         for regularDefinition in regularDefinitions do 
@@ -22,7 +22,17 @@ module Converter =
             for word in text do
                 if (word <> text.Head) then
                     let regularExpression = System.String.Concat(System.String.Concat(word.Split('[')).Split(']')) //regularExpression = A-Za-z
-                    for i = 0 to regularExpression.Length do 
-                        regularExpressions.Add regularExpression.[i]
-                        Ok()
-                        |> ignore
+                    while (regularExpression.Contains('-')) do
+                        for i = 0 to regularExpression.Length do 
+                            if (regularExpression.[i].Equals('-')) then
+                                let temp = [regularExpression.[i-1] .. regularExpression.[i+1]]
+                                regularExpressions.Add(Regexp.ofSet(temp))
+                                regularExpression.Remove(i-1, 2) |> ignore
+                    for c in regularExpression do 
+                        regularExpressions.Add(Regexp.ofChar(c))
+                    for regex in regularExpressions do
+                        if (value.Equals(Regexp.empty)) then
+                            value <- regex
+                        else
+                            value <- value * regex
+            // IApi.putRegularDefinition(key, value)
