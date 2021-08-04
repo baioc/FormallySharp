@@ -10,23 +10,23 @@ module Route =
 open System
 
 type Input = 
-    { RegularDefinition: String
-      Token: String
-      Simulation: String }
+    { RegularDefinition: string
+      Token: string
+      Simulation: string }
 
 module Input =
-    let create (regularDefinition: String, token: String, simulation: string) = 
+    let create (regularDefinition: string, token: string, simulation: string) = 
         { RegularDefinition = regularDefinition
           Token = token
           Simulation = simulation }
 
 type Output =
-    { Token: String
-      Lexema: String
+    { Token: string
+      Lexema: string
       Posicao: int }
 
 module Output =
-    let create (token: String, lexema: String, posicao: int) =
+    let create (token: string, lexema: string, posicao: int) =
         { Token = token
           Lexema = lexema
           Posicao = posicao }
@@ -34,4 +34,7 @@ module Output =
 type IApi =
     { getOutputs: unit -> Async<Output list>
       addOutput: Output -> Async<Output> 
-      setInput: Input -> Async<Output list> }
+      setInput: Input -> Async<Output list>
+      // getRegularDefinitions: unit -> string list
+      // addRegularDefinition: string -> string 
+    }

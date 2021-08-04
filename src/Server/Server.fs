@@ -6,12 +6,17 @@ open Saturn
 open Giraffe
 
 open Shared
+open Formally.Regular
 
 
 type Storage() =
     let outputs = ResizeArray<_>()
 
     let mutable input = Input.create("","","")
+
+    // let mutable regularDefinitions = ResizeArray<string>()
+
+    let mutable regularDefinitionsMap = Map<string,Regexp>
 
     member __.GetOutputs() = 
         List.ofSeq outputs
@@ -20,9 +25,25 @@ type Storage() =
         outputs.Add output
         Ok()
 
+    member __.GetInput() = 
+        input
+
     member __.SetInput(input1: Input) = 
         input <- input1
         Ok()
+
+    // member __.GetRegularDefinitions() = 
+    //     List.ofSeq regularDefinitions
+
+    // member __.AddRegularDefinition(regularDefinition: string) =
+    //     regularDefinitions.Add regularDefinition
+    //     Ok()
+
+    member __.GetRegularDefinitionsMap() =
+        regularDefinitionsMap
+
+    member __.PutRegularDefinition(regularDefinition: string, regex: Regexp) =
+        regularDefinitionsMap <- Map.add regularDefinition regex regularDefinitionsMap
 
 
 let storage = Storage()
@@ -57,6 +78,15 @@ let api =
                     storage.SetInput(input)
                     return storage.GetOutputs() 
                 }
+
+    //   getRegularDefinitions = 
+    //         fun () ->
+    //             storage.GetRegularDefinitions() 
+
+    //   addRegularDefinition =
+    //         fun regularDefinition ->
+    //             match storage.AddRegularDefinition regularDefinition with
+    //             | Ok () -> regularDefinition
     }
 
 let webApp =
