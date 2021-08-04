@@ -7,7 +7,7 @@ open Giraffe
 
 open Shared
 open Formally.Regular
-
+open Formally.Converter
 
 type Storage() =
     let outputs = ResizeArray<_>()
@@ -76,6 +76,7 @@ let api =
             fun input ->
                 async {
                     storage.SetInput(input)
+                    Converter.convertRegularDefinitionTextToRegexp(input.RegularDefinition)
                     return storage.GetOutputs() 
                 }
 
