@@ -12,6 +12,7 @@ module Converter =
         let mutable start = 0
         let mutable finish = 0
         let mutable setDetected = false
+        let mutable bracketDetected = false
 
         let text = List.ofArray(regularDefinition.Split(':'))
         key <- text.Head // key = "L"
@@ -38,8 +39,6 @@ module Converter =
                 expressions.Add(tempRegex)
                 setDetected <- false
         
-        let mutable bracketDetected = false
-        let mutable kleeneDetected = false
         for i = 0 to (expressions.Count - 1) do
             if (value.Equals(Regexp.empty)) then
                 value <- expressions.[i]
@@ -79,12 +78,63 @@ module Converter =
                             insideRegex <- insideRegex * item
                 pipeDetected <- false
                 if (expressions.[i+1].Equals(Regexp.ofChar('*'))) then
-                    kleeneDetected <- true
                     value <- value * (!* insideRegex)
                 else
                     value <- value * insideRegex
                 bracketDetected <- false
-            elif (expressions.[i].Equals(Regexp.ofChar('*')) && kleeneDetected) then
-                ignore()
         key, value
                 
+
+
+
+    let getRegexFromBracketString(expressions: ResizeArray<Regexp>) = 
+        let mutable value = Regexp.empty
+        let expressions = ResizeArray<Regexp>()
+        let mutable start = 0
+        let mutable finish = 0
+        let mutable bracketDetected = false
+        for i = 0 to (expressions.Count - 1) do
+            if (value.Equals(Regexp.empty)) then
+                value <- expressions.[i]
+            elif (expressions.[i] <> Regexp.ofChar('(') && expressions.[i] <> Regexp.ofChar(')') && expressions.[i] <> Regexp.ofChar('*') && expressions.[i] <> Regexp.ofChar('|') && not(bracketDetected)) then
+                value <- value * expressions.[i]
+            elif (expressions.[i].Equals(Regexp.ofChar('('))) then
+                bracketDetected <- true
+                start <- i
+            elif (expressions.[i].Equals(Regexp.ofChar(')'))) then
+                finish <- i
+                let inside = expressions.GetRange(start,(finish - start + 1)) // inside = "(aba|c)"
+                let mutable pipeDetected = false
+                let mutable insideRegex = Regexp.empty
+                for j = 0 to (inside.Count - 1) do
+                    if (inside.[j].Equals(Regexp.ofChar('|'))) then
+                        pipeDetected <- true
+                        let leftList = inside.GetRange(1, j-1)
+                        let mutable left = Regexp.empty
+                        for item in leftList do
+                            if (left.Equals(Regexp.empty)) then
+                                left <- item
+                            else 
+                                left <- left * item
+                        let rightList = inside.GetRange(j+1, inside.Count-1-(j+1))
+                        let mutable right = Regexp.empty
+                        for item in rightList do
+                            if (right.Equals(Regexp.empty)) then
+                                right <- item
+                            else 
+                                right <- left * item
+                        insideRegex <- left + right
+                if (not(pipeDetected)) then
+                    for item in inside do
+                        if (insideRegex.Equals(Regexp.empty)) then
+                            insideRegex <- item
+                        else
+                            insideRegex <- insideRegex * item
+                pipeDetected <- false
+                if (expressions.[i+1].Equals(Regexp.ofChar('*'))) then
+                    value <- value * (!* insideRegex)
+                else
+                    value <- value * insideRegex
+                bracketDetected <- false
+        value
+        
