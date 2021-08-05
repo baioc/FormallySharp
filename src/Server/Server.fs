@@ -16,6 +16,8 @@ type Storage() =
 
     let mutable regularDefinitionsMap = Map.empty
 
+    let mutable debugHelper = ""
+
     member __.GetOutputs() = 
         List.ofSeq outputs
 
@@ -35,6 +37,9 @@ type Storage() =
 
     member __.PutRegularDefinition(regularDefinition: string, regex: Regexp) =
         regularDefinitionsMap <- Map.add regularDefinition regex regularDefinitionsMap
+
+    member __.SetDebugHelper(value: string) = 
+        debugHelper <- value
 
 
 let storage = Storage()
@@ -71,6 +76,7 @@ let api =
                     for regularDefinition in regularDefinitions do 
                         let key, value = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
                         storage.PutRegularDefinition(key, value)
+                        storage.SetDebugHelper(value.ToString())
                     return storage.GetOutputs() 
                 }
 
