@@ -84,6 +84,7 @@ module Automaton =
     let rec fold folder state =
         { new IAutomaton<_, _, _> with
             member __.View = state
+
             member __.Step input =
                 let next = folder state input
                 next, (fold folder next) }

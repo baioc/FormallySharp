@@ -283,21 +283,13 @@ module Nfa =
                 { Dead = set []
                   Current = set [ "$" ]
                   Accepting =
-                      set [ set [ "ABBA" ]
-                            set [ "$"; "A"; "ABBA" ]
+                      set [ set [ "$"; "A"; "ABBA" ]
                             set [ "$"; "AB"; "ABBA" ]
                             set [ "$"; "ABB"; "ABBA" ]
                             set [ "$"; "ABBA" ] ]
                   Transitions =
-                      map [ // original states
-                            (set [ "$" ],    'a') => set [ "$"; "A" ]
-                            (set [ "$" ],    'b') => set [ "$" ]
-                            (set [ "A" ],    'b') => set [ "AB" ]
-                            (set [ "AB" ],   'b') => set [ "ABB" ]
-                            (set [ "ABB" ],  'a') => set [ "ABBA" ]
-                            (set [ "ABBA" ], 'a') => set [ "ABBA" ]
-                            (set [ "ABBA" ], 'b') => set [ "ABBA" ]
-                            // combined states
+                      map [ (set [ "$" ],                'a') => set [ "$"; "A" ]
+                            (set [ "$" ],                'b') => set [ "$"; ]
                             (set [ "$"; "A" ],           'a') => set [ "$"; "A" ]
                             (set [ "$"; "A" ],           'b') => set [ "$"; "AB" ]
                             (set [ "$"; "AB" ],          'a') => set [ "$"; "A" ]

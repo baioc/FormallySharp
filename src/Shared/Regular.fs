@@ -150,33 +150,30 @@ module Regexp =
 
 open Formally.Automata
 
-/// Helpers specifically dealing with finite transition tables aka multigraphs.
-[<System.Runtime.CompilerServices.Extension>]
-module Automaton =
+// Helpers specifically dealing with finite transition tables.
+module Finite =
     /// Finds, in a nondeterministic transition table, the set of states
     /// recursively reachable only by epsilon transitions from an initial state
     /// while applying a state projection function at each transition output.
-    let epsilonClosure getState transitionTable initial =
+    let closure epsilon getState transitionTable initial =
         let transitions arc =
             Map.tryFind arc transitionTable |> Option.defaultValue Set.empty
 
         // depth-first traversal in a possibly cyclic graph
         let rec epsilonReachable visited current =
             if Set.contains current visited then
-                set []
+                Set.empty
             else
                 let visited = Set.add current visited
 
-                transitions (current, None)
+                transitions (current, epsilon)
                 |> Seq.map (getState >> epsilonReachable visited)
                 |> Set.unionMany
                 |> Set.add current
 
         epsilonReachable Set.empty initial
 
-    /// Converts from nondeterministic to deterministic transition table of sets.
-    let determinize getState transitionTable =
-        failwith "FIXME: implement `determinize`"
+    let internal epsilonClosure table state = closure None id table state
 
 /// Deterministic Finite Automaton (DFA) for regular language recognition.
 type Dfa<'State when 'State: comparison> =
@@ -214,7 +211,7 @@ type Nfa<'State when 'State: comparison> =
     { Transitions: Map<('State * option<Symbol>), Set<'State>>
       Current: Set<'State>
       Accepting: Set<'State> }
-    member __.Dead : Set<'State> = set []
+    member __.Dead : Set<'State> = Set.empty
 
     member this.States : Set<'State> =
         Map.toSeq this.Transitions
@@ -235,7 +232,7 @@ type Nfa<'State when 'State: comparison> =
 
         override this.Step input =
             let defaultOf state =
-                if Option.isNone input then set [ state ] else set []
+                if Option.isNone input then Set.singleton state else Set.empty
 
             let nextStates =
                 this.Current
@@ -245,7 +242,7 @@ type Nfa<'State when 'State: comparison> =
                         Map.tryFind (state, input) this.Transitions
                         |> Option.defaultValue (defaultOf state)
                         // then unite the epsilon closures of each next state
-                        |> Seq.map (Automaton.epsilonClosure id this.Transitions)
+                        |> Seq.map (Finite.epsilonClosure this.Transitions)
                         |> Set.unionMany)
                 |> Set.unionMany // then get the union of all that
 
@@ -285,21 +282,72 @@ module Nfa =
               |> Seq.map (fun ((q, i), q') -> (q, Some i), set [ q' ])
               |> Map.ofSeq }
 
-    /// Converts an NFA into an equivalent DFA.
+    /// Converts an NFA into an equivalent DFA with no unreachable states.
     ///
     /// This is NOT the inverse of `ofDfa`, since states get wrapped into sets.
-    let toDfa nfa =
-        // determinize the entire transition table
-        let determinized = Automaton.determinize id nfa.Transitions
+    let toDfa (nfa: Nfa<_>) =
+        // compute and store the epsilon closure of each atomic state
+        let epsilonClosures =
+            nfa.States
+            |> Seq.map (fun state -> state, Finite.epsilonClosure nfa.Transitions state)
+            |> Map.ofSeq
+
+        // define an epsilon-free transition from a composed state
+        let step states symbol =
+            states
+            |> Set.map
+                (fun atomicState ->
+                    Map.tryFind (atomicState, Some symbol) nfa.Transitions
+                    |> Option.defaultValue Set.empty
+                    |> Seq.map (fun nextState -> Map.find nextState epsilonClosures)
+                    |> Set.unionMany)
+            |> Set.unionMany
+
+        let alphabet = nfa.Alphabet
+        // recursively transition by each symbol until we get to every reachable state
+        let rec buildTable transitionTable visitedStates missingStates =
+            match missingStates with
+            | [] -> transitionTable
+            | currentState :: missingStates ->
+                // find all non-empty transitions from the current state
+                let newTransitions =
+                    alphabet
+                    |> Seq.map (fun symbol -> symbol, step currentState symbol)
+                    |> Seq.filter (fun (symbol, reached) -> reached <> Set.empty)
+                    |> Set.ofSeq
+                // add those transitions to the table
+                let transitionTable =
+                    newTransitions
+                    |> Set.fold
+                        (fun table (symbol, nextState) ->
+                            Map.add (currentState, symbol) nextState table)
+                        transitionTable
+                // add the newly reached states to:
+                let nextStates =
+                    newTransitions
+                    |> Seq.map (fun (symbol, state) -> state)
+                    |> Seq.filter (fun state -> not (Set.contains state visitedStates))
+                    |> Set.ofSeq
+                // a) the visited set
+                let visitedStates = Set.union visitedStates nextStates
+                // b) the to-do list
+                let missingStates =
+                    nextStates
+                    |> Set.fold (fun missing state -> state :: missing) missingStates
+                // then, keep going
+                buildTable transitionTable visitedStates missingStates
+
+        let determinized =
+            buildTable Map.empty (Set.singleton nfa.Current) [ nfa.Current ]
 
         // accepting states are any that intersect with the initial accepting set
         let accepting =
             Map.toSeq determinized
             |> Seq.map (fun ((q, a), q') -> set [ q; q' ])
             |> Set.unionMany
-            |> Set.filter (fun state -> Set.intersect state nfa.Accepting <> set [])
+            |> Set.filter (fun state -> Set.intersect state nfa.Accepting <> Set.empty)
 
-        { Dead = set []
+        { Dead = Set.empty
           Current = nfa.Current
           Transitions = determinized
           Accepting = accepting }
