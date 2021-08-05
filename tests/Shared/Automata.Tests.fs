@@ -50,7 +50,7 @@ module Automaton =
     // functional counter automaton
     let inline sumFrom initial = Automaton.fold (+) initial
 
-    let tests = testList "Automata" [
+    let tests = testList "Generalized Automata" [
         testCase "Functional style" <| fun _ ->
             let fromZero = sumFrom 0I
             let _, fromOne = (1I, fromZero) ||> Automaton.step

@@ -2,33 +2,26 @@
 
 namespace Formally.Regular
 
-// just a local alias to improve readability
-type private Symbol = char
-
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
 ///
 /// The union cases are only exposed for consuming Regexps. Construction
 /// should be done with the algebraic operators or module functions.
-type Regexp =
-    | Literal of Symbol
-    | Alternation of Set<Regexp>
-    | Concatenation of Regexp list
-    | KleeneClosure of Regexp
+type Regexp<'Symbol when 'Symbol: comparison> =
+    | Literal of 'Symbol
+    | Alternation of Set<Regexp<'Symbol>>
+    | Concatenation of Regexp<'Symbol> list
+    | KleeneClosure of Regexp<'Symbol>
 
     static member Zero = Alternation Set.empty
     static member One = Concatenation []
 
     /// Choice operator, can accept either one of the given regexps.
-    static member (+)(r: Regexp, s: Regexp) =
-        // active pattern to help identify special cases
-        let (|Zero|Regexp|) r =
-            if r = Regexp.Zero then Zero r else Regexp r
-
+    static member (+)(r: Regexp<'Symbol>, s: Regexp<'Symbol>) =
         match r, s with
         // if any operand is zero, return the other
-        | Zero _, regex
-        | regex, Zero _ -> regex
+        | zero, regex
+        | regex, zero when zero = Regexp<'Symbol>.Zero -> regex
         // when both are sets, unite them
         | Alternation r, Alternation s -> Alternation <| Set.union r s
         // when just one is a set, add the other one to the set
@@ -38,19 +31,14 @@ type Regexp =
         | r, s -> if r = s then r else Alternation <| set [ r; s ]
 
     /// Concatenation operator, must accept the first, then the second regexp.
-    static member (*)(r: Regexp, s: Regexp) =
-        let (|Zero|One|Regexp|) r =
-            if r = Regexp.Zero then Zero r
-            elif r = Regexp.One then One r
-            else Regexp r
-
+    static member (*)(r: Regexp<'Symbol>, s: Regexp<'Symbol>) =
         match r, s with
         // if any operand is zero, return zero
-        | Zero zero, _
-        | _, Zero zero -> zero
+        | zero, _
+        | _, zero when zero = Regexp<'Symbol>.Zero -> zero
         // if any operand is one, return the other
-        | One _, regex
-        | regex, One _ -> regex
+        | one, regex
+        | regex, one when one = Regexp<'Symbol>.One -> regex
         // when both are lists, append them
         | Concatenation a, Concatenation b -> Concatenation <| List.append a b
         // when just one is a list, append the other in the right order
@@ -60,17 +48,16 @@ type Regexp =
         | r, s -> Concatenation <| [ r; s ]
 
     /// Kleene star/closure operator: zero or more repetitions of a regexp.
-    static member (!*)(r: Regexp) =
+    static member (!*)(r: Regexp<'Symbol>) =
         match r with
         // by definition, 0* = 1* = 1
-        | r when r = Regexp.Zero -> Regexp.One
-        | r when r = Regexp.One -> Regexp.One
+        | r when r = Regexp<'Symbol>.Zero -> Regexp<'Symbol>.One
+        | r when r = Regexp<'Symbol>.One -> Regexp<'Symbol>.One
         // (r*)* = r*
         | KleeneClosure r -> KleeneClosure r
         // (r?)* = r*
-        | Alternation set when Set.contains Regexp.One set ->
-            let set = Set.remove Regexp.One set
-
+        | Alternation set when Set.contains Regexp<'Symbol>.One set ->
+            let set = Set.remove Regexp<'Symbol>.One set
             if Set.count set = 1 then
                 Set.minElement set |> (!*)
             else
@@ -79,80 +66,53 @@ type Regexp =
         | r -> KleeneClosure r
 
     /// Optional operator: equivalent to `1 + r`.
-    static member (!?)(r: Regexp) = Regexp.One + r
+    static member (!?)(r: Regexp<'Symbol>) = Regexp<'Symbol>.One + r
 
     /// Positive closure operator: equivalent to `r * !*r`.
-    static member (!+)(r: Regexp) = r * !*r
+    static member (!+)(r: Regexp<'Symbol>) = r * !*r
 
     /// Repetition: fixed number of repetitions of a regexp in sequence.
-    static member Pow(r: Regexp, n: int) =
-        if n <= 0 then Regexp.One
+    static member Pow(r: Regexp<'Symbol>, n: int) =
+        if n <= 0 then Regexp<'Symbol>.One
         elif n = 1 then r
-        else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
-
-    /// Characters which should be escaped.
-    static member escapingChars = set @"+*?^$\.[]{}()|/"
-
-    // pretty printing in a standard(ish?) format
-    override this.ToString() =
-        match this with
-        | Literal c when Set.contains c Regexp.escapingChars -> @"\" + string c
-        | Literal c -> string c
-        | Alternation set when Set.isEmpty set -> "(.^)" // rejects any input, including empty strings
-        | Alternation set when Set.count set = 1 -> Set.minElement set |> string
-        | Alternation set when Set.contains Regexp.One set ->
-            Set.remove Regexp.One set |> Alternation |> sprintf "(%O?)"
-        | Alternation set -> String.concat "|" (Seq.map string set) |> sprintf "(%s)"
-        | Concatenation list ->
-            let rec printSeq =
-                function
-                | [] -> ""
-                | r :: KleeneClosure s :: rest
-                | KleeneClosure s :: r :: rest when r = s -> (sprintf "(%O+)" r) + (printSeq rest)
-                | first :: rest -> (string first) + (printSeq rest)
-
-            match printSeq list with
-            | "" -> ""
-            | str when str.StartsWith '(' && str.EndsWith ')' -> str
-            | str -> sprintf "(%s)" str
-        | KleeneClosure regex -> sprintf "(%O*)" regex
+        else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp<'Symbol>.One
 
 [<RequireQualifiedAccess>] // since we use standard collection names
 module Regexp =
     /// Constructs a regexp from an atomic literal.
-    let ofChar s = Literal s
+    let singleton s = Literal s
 
     /// Rejects everything. Equivalent to `Alternation Set.empty`.
-    let none = Regexp.Zero
+    let none<'Symbol when 'Symbol: comparison> = Regexp<'Symbol>.Zero
 
     /// The empty string, a.k.a. epsilon. Equivalent to `Concatenation []`.
-    let empty = Regexp.One
+    let empty<'Symbol when 'Symbol: comparison> = Regexp<'Symbol>.One
 
     /// Alias of (+)
-    let inline union (r: Regexp) (s: Regexp) = r + s
+    let inline union (r: Regexp<'Symbol>) (s: Regexp<'Symbol>) = r + s
 
     /// Alias of (*)
-    let inline append (r: Regexp) (s: Regexp) = r * s
+    let inline append (r: Regexp<'Symbol>) (s: Regexp<'Symbol>) = r * s
 
     /// Alias of (!*)
-    let inline star (r: Regexp) = !*r
+    let inline star (r: Regexp<'Symbol>) = !*r
 
     /// Constructs a regexp from a sequence of symbols.
     let ofSeq group =
-        group |> Seq.map ofChar |> Seq.fold (*) Regexp.One
+        group |> Seq.map singleton |> Seq.fold (*) Regexp<'Symbol>.One
 
     /// Constructs a regexp from an unordered set of symbols.
     let ofSet group =
-        group |> Seq.map ofChar |> Seq.fold (+) Regexp.Zero
+        group |> Seq.map singleton |> Seq.fold (+) Regexp<'Symbol>.Zero
 
     /// Alias of (!?)
-    let inline maybe (r: Regexp) = !?r
+    let inline maybe (r: Regexp<'Symbol>) = !?r
 
     /// Alias of (!+)
-    let inline many (r: Regexp) = !+r
+    let inline many (r: Regexp<'Symbol>) = !+r
 
     /// Alternative for (**)
-    let inline init n (r: Regexp) = r ** n
+    let inline init n (r: Regexp<'Symbol>) = r ** n
 
 
 open Formally.Automata
@@ -172,7 +132,6 @@ module Finite =
                 Set.empty
             else
                 let visited = Set.add current visited
-
                 transitions (current, epsilon)
                 |> Seq.map (getState >> epsilonReachable visited)
                 |> Set.unionMany
@@ -183,8 +142,8 @@ module Finite =
     let internal epsilonClosure table state = closure None id table state
 
 /// Deterministic Finite Automaton (DFA) for regular language recognition.
-type Dfa<'State when 'State: comparison> =
-    { Transitions: Map<('State * Symbol), 'State>
+type Dfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
+    { Transitions: Map<('State * 'Symbol), 'State>
       Current: 'State
       Accepting: Set<'State>
       Dead: 'State }
@@ -198,14 +157,13 @@ type Dfa<'State when 'State: comparison> =
         |> Set.union this.Accepting
         |> Set.add this.Dead
 
-    member this.Alphabet : Set<Symbol> =
+    member this.Alphabet : Set<'Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> a)
         |> Set.ofSeq
 
-    interface IAutomaton<'State, Symbol, unit> with
+    interface IAutomaton<'State, 'Symbol, unit> with
         override this.View = this.Current
-
         override this.Step input =
             let next =
                 Map.tryFind (this.Current, input) this.Transitions
@@ -214,8 +172,8 @@ type Dfa<'State when 'State: comparison> =
             (), { this with Current = next } :> IAutomaton<_, _, _>
 
 /// Nondeterministic Finite Automaton (NFA) for regular language recognition.
-type Nfa<'State when 'State: comparison> =
-    { Transitions: Map<('State * option<Symbol>), Set<'State>>
+type Nfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
+    { Transitions: Map<('State * option<'Symbol>), Set<'State>>
       Current: Set<'State>
       Accepting: Set<'State> }
     member __.Dead : Set<'State> = Set.empty
@@ -227,14 +185,14 @@ type Nfa<'State when 'State: comparison> =
         |> Set.union this.Current
         |> Set.union this.Accepting
 
-    member this.Alphabet : Set<Symbol> =
+    member this.Alphabet : Set<'Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> a)
         |> Seq.filter Option.isSome
         |> Seq.map Option.get
         |> Set.ofSeq
 
-    interface IAutomaton<Set<'State>, option<Symbol>, unit> with
+    interface IAutomaton<Set<'State>, option<'Symbol>, unit> with
         override this.View = this.Current
 
         override this.Step input =
@@ -272,7 +230,6 @@ module Nfa =
         // which would otherwise be lost when building the transition table below
         let a = map Choice1Of2 a
         let b = map Choice2Of2 b
-
         { Accepting = Set.union a.Accepting b.Accepting
           Current = Set.union a.Current b.Current
           Transitions =
@@ -280,7 +237,7 @@ module Nfa =
               |> Map.ofSeq }
 
     /// Trivial mapping of deterministic to nondeterministic automaton.
-    let ofDfa (dfa: Dfa<_>) =
+    let ofDfa (dfa: Dfa<_, _>) =
         { Current = set [ dfa.Current ]
           Accepting = dfa.Accepting
           Transitions =
@@ -291,7 +248,7 @@ module Nfa =
     /// Converts an NFA into an equivalent DFA with no unreachable states.
     ///
     /// This is NOT the inverse of `ofDfa`, since states get wrapped into sets.
-    let toDfa (nfa: Nfa<_>) =
+    let toDfa (nfa: Nfa<_, _>) =
         // compute and store the epsilon closure of each atomic state
         let epsilonClosures =
             nfa.States
@@ -356,4 +313,116 @@ module Nfa =
         { Dead = Set.empty
           Current = nfa.Current
           Transitions = determinized
+          Accepting = accepting }
+
+[<RequireQualifiedAccess>]
+module Dfa =
+    let toNfa = Nfa.ofDfa
+    let ofNfa = Nfa.toDfa
+
+    /// Converts a Regexp directly to a DFA through Aho's algorithm.
+    let ofRegexp regexp =
+        let terminator = Unchecked.defaultof<_>
+        let mutable followposTable = System.Collections.Generic.Dictionary()
+        let mutable correspondenceTable = System.Collections.Generic.Dictionary()
+        let mutable inputSymbols = Set.empty
+        let mutable index = 0
+        // assigns a unique index to every leaf node while initializing the tables above
+        let rec doIndexing =
+            function
+            | Literal symbol ->
+                do
+                    index <- index + 1
+                    followposTable.[index] <- Set.empty
+                    correspondenceTable.[index] <- symbol
+                    if symbol <> terminator then
+                        inputSymbols <- Set.add symbol inputSymbols
+                Literal(symbol, index)
+            | Alternation set -> Set.map doIndexing set |> Alternation
+            | Concatenation seq -> List.map doIndexing seq |> Concatenation
+            | KleeneClosure r -> doIndexing r |> KleeneClosure
+
+        // also concatenate a unique terminator to our regexp
+        let regexp =
+            doIndexing <| (regexp * (Regexp.singleton terminator))
+
+        let rec nullable =
+            function
+            | Literal _ -> false
+            | Alternation set -> Set.exists nullable set
+            | Concatenation [] -> true
+            | Concatenation (first :: rest) -> nullable first && nullable (Concatenation rest)
+            | KleeneClosure _ -> true
+
+        let rec firstpos =
+            function
+            | Literal (_, index) -> Set.singleton index
+            | Alternation set -> Seq.map firstpos set |> Set.unionMany
+            | Concatenation [] -> Set.empty
+            | Concatenation (first :: rest) ->
+                let second = Concatenation rest
+                if nullable first then Set.union (firstpos first) (firstpos second)
+                else firstpos first
+            | KleeneClosure r -> firstpos r
+
+        let rec lastpos =
+            function
+            | Literal (_, index) -> Set.singleton index
+            | Alternation set -> Seq.map lastpos set |> Set.unionMany
+            | Concatenation [] -> Set.empty
+            | Concatenation (first :: rest) ->
+                let second = Concatenation rest
+                if nullable second then Set.union (lastpos first) (lastpos second)
+                else lastpos second
+            | KleeneClosure r -> lastpos r
+
+        // incrementally fills the followpos table
+        let rec fillFollowpos =
+            function
+            | KleeneClosure node ->
+                let firsts = firstpos node
+                for i in lastpos node do
+                    followposTable.[i] <- Set.union followposTable.[i] firsts
+                do fillFollowpos node
+            | Concatenation (left :: rest) ->
+                let right = Concatenation rest
+                let firsts = firstpos right
+                for i in lastpos left do
+                    followposTable.[i] <- Set.union followposTable.[i] firsts
+                do
+                    fillFollowpos left
+                    fillFollowpos right
+            | Alternation set -> Set.iter fillFollowpos set
+            | Concatenation []
+            | Literal _ -> ()
+
+        do fillFollowpos regexp
+        // after filling the followpos table, build the transition table
+        let mutable transitionTable = Map.empty
+        let initialState = firstpos regexp
+        let mutable visitedStates = Set.empty
+        let mutable unmarkedStates = set [ initialState ]
+
+        while not (Set.isEmpty unmarkedStates) do
+            let state = Set.minElement unmarkedStates
+            unmarkedStates <- Set.remove state unmarkedStates
+            visitedStates <- Set.add state visitedStates
+            for symbol in inputSymbols do
+                let next =
+                    state
+                    |> Seq.filter (fun i -> correspondenceTable.[i] = symbol)
+                    |> Seq.map (fun i -> followposTable.[i])
+                    |> Set.unionMany
+                transitionTable <- Map.add (state, symbol) next transitionTable
+                if not (Set.contains next visitedStates) then
+                    unmarkedStates <- Set.add next unmarkedStates
+
+        // accepting states are all which contain the terminator's index
+        let accepting =
+            visitedStates
+            |> Set.filter (Set.exists (fun i -> correspondenceTable.[i] = terminator))
+
+        { Dead = set []
+          Transitions = transitionTable
+          Current = initialState
           Accepting = accepting }

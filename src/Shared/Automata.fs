@@ -44,7 +44,6 @@ module Automaton =
     let rec private withAdapters viewAdapter inputAdapter outputAdapter automaton =
         { new IAutomaton<_, _, _> with
             member __.View = view automaton |> viewAdapter
-
             member __.Step input =
                 let output, next = step (inputAdapter input) automaton
                 (outputAdapter output), (withAdapters viewAdapter inputAdapter outputAdapter next) }
@@ -66,7 +65,6 @@ module Automaton =
                 let y, nextInner = step x inner
                 let z, nextOuter = step y outer
                 z, (compose nextOuter nextInner)
-
             member __.View = view inner, view outer }
 
     /// Combines two automata in synchronous "parallelism".
@@ -77,14 +75,12 @@ module Automaton =
                 let outA, nextA = step inA a
                 let outB, nextB = step inB b
                 (outA, outB), (zip nextA nextB)
-
             member __.View = view a, view b }
 
     /// Wraps a folding function + initial state into an observable machine.
     let rec fold folder state =
         { new IAutomaton<_, _, _> with
-            member __.View = state
-
             member __.Step input =
                 let next = folder state input
-                next, (fold folder next) }
+                next, (fold folder next)
+            member __.View = state }

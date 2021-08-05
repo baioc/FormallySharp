@@ -17,7 +17,7 @@ module Extensions =
         member this.NextRegexp() =
             let rand = this.Next(128)
             let c = char rand
-            if not (Char.IsControl c) then Regexp.ofChar c
+            if not (Char.IsControl c) then Regexp.singleton c
             elif rand % 2 = 0 then Regexp.Zero
             else Regexp.One
 
@@ -101,15 +101,15 @@ module Regexp =
                     Expect.equal (!* (!? r)) (!*r) "For all r, (!* (!? r) should be equal to (!*r)")
 
         testCase "Strings can be converted to regexps" <| fun _ ->
-            let a = Regexp.ofChar 'a'
-            let b = Regexp.ofChar 'b'
-            let c = Regexp.ofChar 'c'
+            let a = Regexp.singleton 'a'
+            let b = Regexp.singleton 'b'
+            let c = Regexp.singleton 'c'
             Expect.equal (Regexp.ofSeq "abc") (a * b * c)
                 "\"abc\" should be equal to 'a' * 'b' * 'c'"
 
         testCase "Char ranges can be converted to regexps" <| fun _ ->
             let alpha = [ 'a' .. 'z' ]
-            let alphaGroup = Seq.map Regexp.ofChar alpha |> Seq.fold (+) Regexp.Zero
+            let alphaGroup = Seq.map Regexp.singleton alpha |> Seq.fold (+) Regexp.Zero
             Expect.equal (Regexp.ofSet alpha) alphaGroup "['a' .. 'z'] should be equal to /a-z/"
 
         testCase "Optional operator (!?)" <| fun _ ->
@@ -147,27 +147,6 @@ module Regexp =
                     Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
                     Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
                     Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)")
-
-        testCase "Pretty printing" <| fun _ ->
-            let message = "Should have been printed in standard regex syntax"
-            let a = Regexp.ofChar 'a'
-            let b = Regexp.ofChar 'b'
-            let c = Regexp.ofChar 'c'
-            Expect.equal (string a) "a" message
-            Expect.equal (string b) "b" message
-            Expect.equal (string c) "c" message
-            Expect.equal (string (a * b * c)) "(abc)" message
-            Expect.equal (string (a + b + c)) "(a|b|c)" message
-            Expect.equal (string (!* a)) "(a*)" message
-            Expect.equal (string (!? a)) "(a?)" message
-            Expect.equal (string (!+ a)) "(a+)" message
-            Expect.equal (string Regexp.empty) "" message
-            Expect.equal (string Regexp.none) "(.^)" message
-            Expect.equal (string (Regexp.ofSeq @"+*?^$\.[]{}()|/"))
-                         @"(\+\*\?\^\$\\\.\[\]\{\}\(\)\|\/)" message
-            Expect.equal (string (b * a * (!* a) * b)) "(b(a+)b)" message
-            Expect.equal (string (b * (!* a) * a * b)) "(b(a+)b)" message
-            Expect.equal (string (a + Regexp.empty + b + Regexp.empty + c)) "((a|b|c)?)" message
     ]
 
 
@@ -206,7 +185,7 @@ module Nfa =
                     ("ABBA", Some 'b') => set [ "ABBA" ] ] }
 
     // NFA with cyclic and reflexive epsilon transitions. rejects all input
-    let cyclic =
+    let cyclic: Nfa<_, int> =
         { Current = set [ 'A' ]
           Accepting = set []
           Transitions =
@@ -327,4 +306,23 @@ module Nfa =
                             (set [ "$"; "ABBA" ],        'a') => set [ "$"; "A"; "ABBA" ]
                             (set [ "$"; "ABBA" ],        'b') => set [ "$"; "ABBA" ] ] }
             Expect.equal (Nfa.toDfa abba) detAbba "Should have been fully determinized"
+
+        testCase "DFA from Regexp" <| fun _ ->
+            let expected =
+                { Dead = set []
+                  Current = set [ 1; 2; 3 ]
+                  Accepting = set [ set [ 1; 2; 3; 6 ] ]
+                  Transitions =
+                      map [ (set [ 1; 2; 3 ],    'a') => set [ 1; 2; 3; 4 ]
+                            (set [ 1; 2; 3 ],    'b') => set [ 1; 2; 3 ]
+                            (set [ 1; 2; 3; 4 ], 'a') => set [ 1; 2; 3; 4 ]
+                            (set [ 1; 2; 3; 4 ], 'b') => set [ 1; 2; 3; 5 ]
+                            (set [ 1; 2; 3; 5 ], 'a') => set [ 1; 2; 3; 4 ]
+                            (set [ 1; 2; 3; 5 ], 'b') => set [ 1; 2; 3; 6 ]
+                            (set [ 1; 2; 3; 6 ], 'a') => set [ 1; 2; 3; 4 ]
+                            (set [ 1; 2; 3; 6 ], 'b') => set [ 1; 2; 3 ] ] }
+            let a = Regexp.singleton 'a'
+            let b = Regexp.singleton 'b'
+            let regexp = (!* (a + b)) * a * b * b
+            Expect.equal (Dfa.ofRegexp regexp) expected "Should have been correctly converted"
     ]
