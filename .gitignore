@@ -15,4 +15,3 @@ release.cmd
 release.sh
 *.orig
 *.DotSettings.user
-.vscode

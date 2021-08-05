@@ -67,7 +67,10 @@ let api =
             fun input ->
                 async {
                     storage.SetInput(input) |> ignore
-                    Converter.convertRegularDefinitionTextToRegexp(input.RegularDefinition)
+                    let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
+                    for regularDefinition in regularDefinitions do 
+                        let algumaMerda, merda2 = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
+                        storage.PutRegularDefinition(algumaMerda, merda2)
                     return storage.GetOutputs() 
                 }
 
