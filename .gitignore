@@ -15,3 +15,7 @@ release.cmd
 release.sh
 *.orig
 *.DotSettings.user
+.vscode/
+*.log
+!.vscode/launch.json
+!.vscode/tasks.json
