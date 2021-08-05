@@ -69,8 +69,8 @@ let api =
                     storage.SetInput(input) |> ignore
                     let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
                     for regularDefinition in regularDefinitions do 
-                        let algumaMerda, merda2 = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
-                        storage.PutRegularDefinition(algumaMerda, merda2)
+                        let key, value = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
+                        storage.PutRegularDefinition(key, value)
                     return storage.GetOutputs() 
                 }
 
