@@ -100,14 +100,11 @@ module Regexp =
                     Expect.equal (!* (!* r)) (!*r) "For all r, (!* (!* r)) should be equal to (!*r)"
                     Expect.equal (!* (!? r)) (!*r) "For all r, (!* (!? r) should be equal to (!*r)")
 
-        testCase "Strings can be converted to regexps" <| fun _ ->
+        testCase "Build regexp from char range" <| fun _ ->
             let a = Regexp.singleton 'a'
             let b = Regexp.singleton 'b'
             let c = Regexp.singleton 'c'
-            Expect.equal (Regexp.ofSeq "abc") (a * b * c)
-                "\"abc\" should be equal to 'a' * 'b' * 'c'"
-
-        testCase "Char ranges can be converted to regexps" <| fun _ ->
+            Expect.equal (Regexp.ofSeq "abc") (a * b * c) "\"abc\" should be equal to 'a'*'b'*'c'"
             let alpha = [ 'a' .. 'z' ]
             let alphaGroup = Seq.map Regexp.singleton alpha |> Seq.fold (+) Regexp.Zero
             Expect.equal (Regexp.ofSet alpha) alphaGroup "['a' .. 'z'] should be equal to /a-z/"
