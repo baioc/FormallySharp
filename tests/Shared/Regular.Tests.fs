@@ -97,14 +97,15 @@ module Regexp =
             randomRegexps()
             |> Seq.iter
                 (fun r ->
-                    Expect.equal (!* !* r) (!*r) "For all r, (!* !* r) should be equal to (!*r)")
+                    Expect.equal (!* (!* r)) (!*r) "For all r, (!* (!* r)) should be equal to (!*r)"
+                    Expect.equal (!* (!? r)) (!*r) "For all r, (!* (!? r) should be equal to (!*r)")
 
         testCase "Strings can be converted to regexps" <| fun _ ->
             let a = Regexp.ofChar 'a'
             let b = Regexp.ofChar 'b'
             let c = Regexp.ofChar 'c'
             Expect.equal (Regexp.ofSeq "abc") (a * b * c)
-                "'abc' should be the equal to 'a' * 'b' * 'c'"
+                "\"abc\" should be equal to 'a' * 'b' * 'c'"
 
         testCase "Char ranges can be converted to regexps" <| fun _ ->
             let alpha = [ 'a' .. 'z' ]
@@ -146,6 +147,27 @@ module Regexp =
                     Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
                     Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
                     Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)")
+
+        testCase "Pretty printing" <| fun _ ->
+            let message = "Should have been printed in standard regex syntax"
+            let a = Regexp.ofChar 'a'
+            let b = Regexp.ofChar 'b'
+            let c = Regexp.ofChar 'c'
+            Expect.equal (string a) "a" message
+            Expect.equal (string b) "b" message
+            Expect.equal (string c) "c" message
+            Expect.equal (string (a * b * c)) "(abc)" message
+            Expect.equal (string (a + b + c)) "(a|b|c)" message
+            Expect.equal (string (!* a)) "(a*)" message
+            Expect.equal (string (!? a)) "(a?)" message
+            Expect.equal (string (!+ a)) "(a+)" message
+            Expect.equal (string Regexp.empty) "" message
+            Expect.equal (string Regexp.none) "(.^)" message
+            Expect.equal (string (Regexp.ofSeq @"+*?^$\.[]{}()|/"))
+                         @"(\+\*\?\^\$\\\.\[\]\{\}\(\)\|\/)" message
+            Expect.equal (string (b * a * (!* a) * b)) "(b(a+)b)" message
+            Expect.equal (string (b * (!* a) * a * b)) "(b(a+)b)" message
+            Expect.equal (string (a + Regexp.empty + b + Regexp.empty + c)) "((a|b|c)?)" message
     ]
 
 

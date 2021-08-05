@@ -7,10 +7,11 @@ type private Symbol = char
 
 
 /// Defines the canonic Kleene algebra, plus some regular expression extensions.
+///
+/// The union cases are only exposed for consuming Regexps. Construction
+/// should be done with the algebraic operators or module functions.
 type Regexp =
-    // these union cases are only exposed for consuming regexps, construction
-    // should be done with the algebraic operators or module functions
-    | Symbol of Symbol
+    | Literal of Symbol
     | Alternation of Set<Regexp>
     | Concatenation of Regexp list
     | KleeneClosure of Regexp
@@ -60,16 +61,22 @@ type Regexp =
 
     /// Kleene star/closure operator: zero or more repetitions of a regexp.
     static member (!*)(r: Regexp) =
+        match r with
         // by definition, 0* = 1* = 1
-        if r = Regexp.Zero then
-            Regexp.One
-        elif r = Regexp.One then
-            Regexp.One
-        // also, (r*)* = r*
-        else
-            match r with
-            | KleeneClosure r
-            | r -> KleeneClosure r
+        | r when r = Regexp.Zero -> Regexp.One
+        | r when r = Regexp.One -> Regexp.One
+        // (r*)* = r*
+        | KleeneClosure r -> KleeneClosure r
+        // (r?)* = r*
+        | Alternation set when Set.contains Regexp.One set ->
+            let set = Set.remove Regexp.One set
+
+            if Set.count set = 1 then
+                Set.minElement set |> (!*)
+            else
+                set |> Alternation |> (!*)
+        // otherwise, just star it
+        | r -> KleeneClosure r
 
     /// Optional operator: equivalent to `1 + r`.
     static member (!?)(r: Regexp) = Regexp.One + r
@@ -83,42 +90,42 @@ type Regexp =
         elif n = 1 then r
         else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp.One
 
-    /// Pretty printing in a standard-ish format.
-    override this.ToString() =
-        let escapingCharacters = @"\()|*.^?"
+    /// Characters which should be escaped.
+    static member escapingChars = set @"+*?^$\.[]{}()|/"
 
+    // pretty printing in a standard(ish?) format
+    override this.ToString() =
         match this with
-        | Symbol c ->
-            if String.exists ((=) c) escapingCharacters then
-                @"\" + string c
-            else
-                string c
-        | Alternation set ->
-            if Set.isEmpty set then
-                "(.^)" // regex to reject any input, including empty strings
-            elif Set.contains Regexp.One set then
-                set
-                |> Set.remove Regexp.One
-                |> Set.fold (+) Regexp.Zero
-                |> sprintf "%A?"
-            else
-                String.concat "|" (Seq.map string set) |> sprintf "(%s)"
-        | Concatenation seq ->
-            if List.isEmpty seq then
-                ""
-            else
-                String.concat "" (Seq.map string seq) |> sprintf "(%s)"
-        | KleeneClosure regex -> string regex + "*"
+        | Literal c when Set.contains c Regexp.escapingChars -> @"\" + string c
+        | Literal c -> string c
+        | Alternation set when Set.isEmpty set -> "(.^)" // rejects any input, including empty strings
+        | Alternation set when Set.count set = 1 -> Set.minElement set |> string
+        | Alternation set when Set.contains Regexp.One set ->
+            Set.remove Regexp.One set |> Alternation |> sprintf "(%O?)"
+        | Alternation set -> String.concat "|" (Seq.map string set) |> sprintf "(%s)"
+        | Concatenation list ->
+            let rec printSeq =
+                function
+                | [] -> ""
+                | r :: KleeneClosure s :: rest
+                | KleeneClosure s :: r :: rest when r = s -> (sprintf "(%O+)" r) + (printSeq rest)
+                | first :: rest -> (string first) + (printSeq rest)
+
+            match printSeq list with
+            | "" -> ""
+            | str when str.StartsWith '(' && str.EndsWith ')' -> str
+            | str -> sprintf "(%s)" str
+        | KleeneClosure regex -> sprintf "(%O*)" regex
 
 [<RequireQualifiedAccess>] // since we use standard collection names
 module Regexp =
-    /// Constructs a regexp for an atomic symbol.
-    let ofChar s = Symbol s
+    /// Constructs a regexp from an atomic literal.
+    let ofChar s = Literal s
 
-    /// Singleton regexp that rejects everything.
+    /// Rejects everything. Equivalent to `Alternation Set.empty`.
     let none = Regexp.Zero
 
-    /// Also known as epsilon, the empty string.
+    /// The empty string, a.k.a. epsilon. Equivalent to `Concatenation []`.
     let empty = Regexp.One
 
     /// Alias of (+)
@@ -248,7 +255,6 @@ type Nfa<'State when 'State: comparison> =
 
             (), { this with Current = nextStates } :> IAutomaton<_, _, _>
 
-/// Operations between NFAs and conversion to/from DFAs and Regexps.
 [<RequireQualifiedAccess>]
 module Nfa =
     /// Transforms an NFA by applying a function over all of its states.
