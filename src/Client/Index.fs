@@ -36,7 +36,7 @@ let api =
 let init () : Model * Cmd<Msg> =
     let model =
         { RegularDefinitionText = "L : [A-Za-z]\nD : [0-9]\nCOMMENT : \"(*\" [^\"*\"]*\"*)\""
-          TokenText = "id : {L} ( {L} | {D} |_)*\nnum : {D}+"
+          TokenText = "id : {L} ( {L} | {D} )*\nnum : {D}*"
           TokenKeyWord = "begin = id : \"begin\"\nend = id : \"end\"\nif = id : \"if\"\nthen  = id : \"then\"\nwhile = id : \"while\"\ndo = id : \"do\"\nwrite = id : \"write\""
           TokenIgnore = ":! {COMMENT}"
           SimulationText = ""

@@ -12,7 +12,7 @@ open Formally.Converter
 type Storage() =
     let outputs = ResizeArray<_>()
 
-    let mutable input = Input.create("","","","", "")
+    let mutable input = Input.create("","","","","")
 
     let mutable regularDefinitionsMap = Map.empty
 
@@ -35,14 +35,14 @@ type Storage() =
     member __.GetRegularDefinitionsMap() =
         regularDefinitionsMap
 
-    member __.PutRegularDefinition(regularDefinition: string, regex: Regexp) =
+    member __.PutRegularDefinition(regularDefinition: string, regex: string) =
         regularDefinitionsMap <- Map.add regularDefinition regex regularDefinitionsMap
 
     member __.GetTokensMap() =
-        regularDefinitionsMap
+        tokensMap
 
     member __.PutToken(token: string, regex: Regexp) =
-        regularDefinitionsMap <- Map.add token regex regularDefinitionsMap
+        tokensMap <- Map.add token regex tokensMap
 
 
 
@@ -78,25 +78,13 @@ let api =
                     storage.SetInput(input) |> ignore
                     let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
                     for regularDefinition in regularDefinitions do 
-                        let key, value = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
-                        storage.PutRegularDefinition(key, value)
+                        let text = List.ofArray(regularDefinition.Split(':'))
+                        storage.PutRegularDefinition(text.Head, text.Item(1))
                     let tokens = List.ofArray(System.String.Concat(input.Token.Split(' ')).Split('\n'))
-                    // for token in tokens do
-                    //     let key, value = Converter.convertTokenTextToRegexp(token)
-                    //     storage.PutToken(key, value)
+                    for token in tokens do
+                        let key, value = Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
+                        storage.PutToken(key, value)
                     return storage.GetOutputs() 
-                }
-
-      getRegularDefinitionsMap = 
-            fun () ->
-                async {
-                    return storage.GetRegularDefinitionsMap()
-                }
-
-      putRegularDefinition = 
-            fun (regularDefinition, regex) ->
-                async {
-                    return storage.PutRegularDefinition(regularDefinition, regex)
                 }
     }
 

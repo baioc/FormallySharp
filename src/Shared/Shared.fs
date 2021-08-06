@@ -40,6 +40,4 @@ type IApi =
     { getOutputs: unit -> Async<Output list>
       addOutput: Output -> Async<Output> 
       setInput: Input -> Async<Output list>
-      getRegularDefinitionsMap: unit -> Async<Map<string,Regexp>>
-      putRegularDefinition: string * Regexp -> Async<unit>
     }
