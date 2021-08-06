@@ -13,12 +13,16 @@ open Formally.Regular
 type Input = 
     { RegularDefinition: string
       Token: string
+      TokenKeyWord: string
+      TokenIgnore: string
       Simulation: string }
 
 module Input =
-    let create (regularDefinition: string, token: string, simulation: string) = 
+    let create (regularDefinition: string, token: string, tokenKeyWord: string, tokenIgnore: string, simulation: string) = 
         { RegularDefinition = regularDefinition
           Token = token
+          TokenKeyWord = tokenKeyWord
+          TokenIgnore = tokenIgnore
           Simulation = simulation }
 
 type Output =

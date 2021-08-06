@@ -12,11 +12,11 @@ open Formally.Converter
 type Storage() =
     let outputs = ResizeArray<_>()
 
-    let mutable input = Input.create("","","")
+    let mutable input = Input.create("","","","", "")
 
     let mutable regularDefinitionsMap = Map.empty
 
-    let mutable debugHelper = ""
+    let mutable tokensMap = Map.empty
 
     member __.GetOutputs() = 
         List.ofSeq outputs
@@ -38,8 +38,12 @@ type Storage() =
     member __.PutRegularDefinition(regularDefinition: string, regex: Regexp) =
         regularDefinitionsMap <- Map.add regularDefinition regex regularDefinitionsMap
 
-    member __.SetDebugHelper(value: string) = 
-        debugHelper <- value
+    member __.GetTokensMap() =
+        regularDefinitionsMap
+
+    member __.PutToken(token: string, regex: Regexp) =
+        regularDefinitionsMap <- Map.add token regex regularDefinitionsMap
+
 
 
 let storage = Storage()
@@ -76,7 +80,10 @@ let api =
                     for regularDefinition in regularDefinitions do 
                         let key, value = Converter.convertRegularDefinitionTextToRegexp(regularDefinition)
                         storage.PutRegularDefinition(key, value)
-                        storage.SetDebugHelper(value.ToString())
+                    let tokens = List.ofArray(System.String.Concat(input.Token.Split(' ')).Split('\n'))
+                    // for token in tokens do
+                    //     let key, value = Converter.convertTokenTextToRegexp(token)
+                    //     storage.PutToken(key, value)
                     return storage.GetOutputs() 
                 }
 

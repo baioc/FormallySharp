@@ -13,12 +13,16 @@ Fable.Core.JsInterop.importAll "./style.css"
 type Model =
     { RegularDefinitionText: string
       TokenText: string
+      TokenKeyWord: string
+      TokenIgnore: string
       SimulationText: string
       Outputs: Output list }
 
 type Msg =
     | SetRegularDefinitionText of string
     | SetTokenText of string
+    | SetTokenKeyWord of string
+    | SetTokenIgnore of string
     | SetSimulationText of string
     | GetOutput of Output list
     | DoLexicalAnalysis
@@ -31,8 +35,10 @@ let api =
 
 let init () : Model * Cmd<Msg> =
     let model =
-        { RegularDefinitionText = ""
-          TokenText = ""
+        { RegularDefinitionText = "L : [A-Za-z]\nD : [0-9]\nCOMMENT : \"(*\" [^\"*\"]*\"*)\""
+          TokenText = "id : {L} ( {L} | {D} |_)*\nnum : {D}+"
+          TokenKeyWord = "begin = id : \"begin\"\nend = id : \"end\"\nif = id : \"if\"\nthen  = id : \"then\"\nwhile = id : \"while\"\ndo = id : \"do\"\nwrite = id : \"write\""
+          TokenIgnore = ":! {COMMENT}"
           SimulationText = ""
           Outputs = [] }
 
@@ -50,6 +56,12 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | SetTokenText value -> 
         { model with 
             TokenText = value }, Cmd.none
+    | SetTokenKeyWord value -> 
+        { model with 
+            TokenKeyWord = value }, Cmd.none
+    | SetTokenIgnore value -> 
+        { model with 
+            TokenIgnore = value }, Cmd.none
     | SetSimulationText value -> 
         { model with 
             SimulationText = value }, Cmd.none
@@ -57,10 +69,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with
               Outputs = outputs }, Cmd.none
     | DoLexicalAnalysis ->
-        let input = Input.create(model.RegularDefinitionText, model.TokenText, model.SimulationText)
+        let input = Input.create(model.RegularDefinitionText, model.TokenText, model.TokenKeyWord, model.TokenIgnore, model.SimulationText)
         let cmd = Cmd.OfAsync.perform api.setInput input FinishedLexicalAnalysis
-        { model with
-            RegularDefinitionText = "Retorno visual pra saber se foi" }, cmd
+        {model with
+              RegularDefinitionText = model.RegularDefinitionText}, cmd
     | FinishedLexicalAnalysis outputs->
         { model with
               Outputs = outputs }, Cmd.none
@@ -73,7 +85,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
-            prop.rows 20
+            prop.rows 30
             prop.value model.RegularDefinitionText
             prop.placeholder "Informe as expressões regulares"
             prop.onChange (fun x -> SetRegularDefinitionText x |> dispatch)
@@ -83,17 +95,30 @@ let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
 let tokensBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
-            prop.rows 20
+            prop.rows 9
             prop.value model.TokenText
             prop.placeholder "Informe os tokens"
             prop.onChange (fun x -> SetTokenText x |> dispatch)
+        ]
+        Bulma.textarea [
+            prop.className "tokenMiddle"
+            prop.rows 9
+            prop.value model.TokenKeyWord
+            prop.placeholder "Informe as Palavras chave"
+            prop.onChange (fun x -> SetTokenKeyWord x |> dispatch)
+        ]
+        Bulma.textarea [
+            prop.rows 9
+            prop.value model.TokenIgnore
+            prop.placeholder "Informar campos a Ignorar"
+            prop.onChange (fun x -> SetTokenIgnore x |> dispatch)
         ]
     ]
 
 let simulatorBox (model: Model) (dispatch: Msg -> unit) =
     Html.div [
         Bulma.textarea [
-            prop.rows 20
+            prop.rows 30
             prop.value model.SimulationText
             prop.placeholder "Insira o texto para simulação"
             prop.onChange (fun x -> SetSimulationText x |> dispatch)
