@@ -77,6 +77,9 @@ type Regexp<'Symbol when 'Symbol: comparison> =
         elif n = 1 then r
         else Seq.init n (fun _ -> r) |> Seq.fold (*) Regexp<'Symbol>.One
 
+/// Standard regexp, using characters as atomic symbols.
+type Regexp = Regexp<char>
+
 [<RequireQualifiedAccess>] // since we use standard collection names
 module Regexp =
     /// Constructs a regexp from an atomic literal.
@@ -213,6 +216,10 @@ type Nfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
 
             (), { this with Current = nextStates } :> IAutomaton<_, _, _>
 
+// slightly less parametric types for the usual case of char symbols
+type Dfa<'State when 'State: comparison> = Dfa<'State, char>
+type Nfa<'State when 'State: comparison> = Nfa<'State, char>
+
 [<RequireQualifiedAccess>]
 module Nfa =
     /// Transforms an NFA by applying a function over all of its states.
@@ -338,9 +345,9 @@ module Dfa =
                     if symbol <> terminator then
                         inputSymbols <- Set.add symbol inputSymbols
                 Literal(symbol, index)
-            | Alternation set -> Set.map doIndexing set |> Alternation
-            | Concatenation seq -> List.map doIndexing seq |> Concatenation
-            | KleeneClosure r -> doIndexing r |> KleeneClosure
+            | Alternation set -> Alternation <| Set.map doIndexing set
+            | Concatenation seq -> Concatenation <| List.map doIndexing seq
+            | KleeneClosure r -> KleeneClosure <| doIndexing r
 
         // also concatenate a unique terminator to our regexp
         let regexp =
