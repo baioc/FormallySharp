@@ -26,43 +26,46 @@ module Regexp =
 
 
 type Model =
-    { ProjectInterface: Project
-      RegularDefinition: string * string }
+    { Project: Project
+      InputText: string
+      RegularDefinition: string * string * string }
 
 type Msg =
-    | SetRegularDefinition of string * string
+    | SetRegularDefinition of string * string * string
     | AddRegularDefinition of string * LexerPart
     | RemoveRegularDefinition of string
     | AddSeparator of Regexp
     | RemoveSeparator of Regexp
+    | SetInputText of string
     | SetProjectId of string
 
 let init () : Model * Cmd<Msg> =
-    let emptyProject =
+    let emptyProject = // TODO
         { Id = ""
           Lexer =
               { RegularDefinitions = Map.ofSeq [ ("zero", Token Regexp.Zero); ("one", Token Regexp.One) ]
                 Separators = Set.empty } }
 
     let model =
-        { ProjectInterface = emptyProject
-          RegularDefinition = "", "" }
+        { Project = emptyProject
+          InputText = ""
+          RegularDefinition = "token", "", "" }
 
     model, Cmd.none
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | SetRegularDefinition (name, body) ->
-        { model with RegularDefinition = name, body },
+    | SetRegularDefinition (kind, name, body) ->
+        { model with RegularDefinition = kind, name, body },
         Cmd.none
 
     | AddRegularDefinition (id, def) ->
-        let project = model.ProjectInterface
+        let project = model.Project
         let lexer = project.Lexer
         let regularDefinitions = lexer.RegularDefinitions
 
         { model with
-              ProjectInterface =
+              Project =
                   { project with
                         Lexer =
                             { lexer with
@@ -70,12 +73,12 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.none
 
     | RemoveRegularDefinition id ->
-        let project = model.ProjectInterface
+        let project = model.Project
         let lexer = project.Lexer
         let regularDefinitions = lexer.RegularDefinitions
 
         { model with
-              ProjectInterface =
+              Project =
                   { project with
                         Lexer =
                             { lexer with
@@ -83,12 +86,12 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.none
 
     | AddSeparator regex ->
-        let project = model.ProjectInterface
+        let project = model.Project
         let lexer = project.Lexer
         let separators = lexer.Separators
 
         { model with
-              ProjectInterface =
+              Project =
                   { project with
                         Lexer =
                             { lexer with
@@ -96,21 +99,25 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Cmd.none
 
     | RemoveSeparator regex ->
-        let project = model.ProjectInterface
+        let project = model.Project
         let lexer = project.Lexer
         let separators = lexer.Separators
 
         { model with
-              ProjectInterface =
+              Project =
                   { project with
                         Lexer =
                             { lexer with
                                   Separators = Set.remove regex separators } } },
         Cmd.none
 
+    | SetInputText text ->
+        { model with InputText = text },
+        Cmd.none
+
     | SetProjectId id ->
         { model with
-              ProjectInterface = { model.ProjectInterface with Id = id } },
+              Project = { model.Project with Id = id } },
         Cmd.none
 
 
@@ -118,68 +125,172 @@ open Feliz
 open Feliz.Bulma
 
 let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
-    let name, body = model.RegularDefinition
+    let kind, name, body = model.RegularDefinition
+    let isSep = kind = "separador"
+    let regexp = Regexp.tryParse body
 
-    Bulma.block [
-        Bulma.content [
-            Html.ol [
-                for def in model.ProjectInterface.Lexer.RegularDefinitions do
-                    Html.li [ prop.text (string def) ]
-            ]
+    let nameIsValid = isSep || isValidId name
+    let regexpIsValid = Option.isSome regexp
+
+    let buttonEnabled = nameIsValid && regexpIsValid
+    let overwrite =
+        (not isSep) && Map.containsKey name model.Project.Lexer.RegularDefinitions
+
+    let addButton =
+        Bulma.button.a [
+            prop.text (if not overwrite then "adicionar" else $"editar '{name}'")
+            prop.disabled (not buttonEnabled)
+            if overwrite then color.isWarning else color.isSuccess
+            prop.onClick
+                (fun _ ->
+                    match kind with
+                    | "separador" ->
+                        Option.get regexp
+                        |> AddSeparator
+                        |> dispatch
+                    | "token" ->
+                        (name, Token (Option.get regexp))
+                        |> AddRegularDefinition
+                        |> dispatch
+                    | "fragmento" ->
+                        (name, Fragment (Option.get regexp))
+                        |> AddRegularDefinition
+                        |> dispatch
+                    | _ -> ())
         ]
-        Bulma.field.div [
-            field.isGrouped
+
+    let viewRegularDefinition name regDef =
+        let name = Option.defaultValue "" name
+        let kind, regexp =
+            match regDef with
+            | Choice2Of2 separatorRegexp -> "separator", separatorRegexp
+            | Choice1Of2 (Token regexp) -> "token", regexp
+            | Choice1Of2 (Fragment regexp) -> "fragment", regexp
+        Bulma.columns [
+            columns.isMobile
+            columns.isVCentered
             prop.children [
-                Bulma.control.div [
-                    Bulma.input.text [
-                        prop.value name
-                        prop.placeholder "nome"
-                        prop.onChange (fun name -> SetRegularDefinition (name, body) |> dispatch)
+                Bulma.column [
+                    Bulma.text.p [
+                        prop.text kind
+                        text.isFamilyCode
+                        color.hasTextPrimary
                     ]
                 ]
-                Bulma.control.div [
-                    control.isExpanded
+                Bulma.column [
+                    Bulma.text.p [
+                        prop.text name
+                        text.isFamilyCode
+                        color.hasTextInfo
+                    ]
+                ]
+                Bulma.column [
+                    column.isTwoFifths
                     prop.children [
-                        Bulma.input.text [
-                            prop.value body
-                            prop.placeholder "expressão regular"
-                            prop.onChange (fun body -> SetRegularDefinition (name, body) |> dispatch)
+                        Bulma.text.p [
+                            prop.text (string regexp)
+                            text.isFamilyCode
                         ]
                     ]
                 ]
-                Bulma.control.div [
-                    Bulma.button.a [
-                        prop.text "adicionar"
-                        prop.disabled
-                            ((not <| isValidId name) || (Regexp.tryParse body |> Option.isNone))
-                        prop.onClick
-                            (fun _ -> // TODO
-                                AddRegularDefinition
-                                    (name,
-                                     Regexp.tryParse body
-                                     |> Option.get
-                                     |> Token)
-                                |> dispatch)
-                        color.isInfo
+                Bulma.column [
+                    column.isNarrow
+                    prop.children [
+                        Bulma.delete [
+                            prop.onClick
+                                (fun _ ->
+                                    match regDef with
+                                    | Choice2Of2 separatorRegexp ->
+                                        separatorRegexp
+                                        |> RemoveSeparator
+                                        |> dispatch
+                                    | Choice1Of2 _ ->
+                                        name
+                                        |> RemoveRegularDefinition
+                                        |> dispatch)
+                        ]
                     ]
                 ]
+            ]
+        ]
+
+    Bulma.block [
+        Bulma.content [
+            for regDef in model.Project.Lexer.RegularDefinitions do
+                viewRegularDefinition (Some regDef.Key) (Choice1Of2 regDef.Value)
+            for regexp in model.Project.Lexer.Separators do
+                viewRegularDefinition None (Choice2Of2 regexp)
+        ]
+        Bulma.columns [
+            Bulma.column [
+                column.isNarrow
+                prop.children [
+                    Bulma.select [
+                        prop.children [
+                            Html.option "token"
+                            Html.option "fragmento"
+                            Html.option "separador"
+                        ]
+                        prop.value kind
+                        prop.onChange
+                            (fun kind ->
+                                (kind, name, body)
+                                |> SetRegularDefinition
+                                |> dispatch)
+                    ]
+                ]
+            ]
+            Bulma.column [
+                column.isOneFifth
+                prop.children [
+                    Bulma.input.text [
+                        prop.value name
+                        prop.placeholder "nome"
+                        prop.disabled isSep
+                        prop.onChange
+                            (fun (name: string) ->
+                                (kind, name.ToUpperInvariant(), body)
+                                |> SetRegularDefinition
+                                |> dispatch)
+                        if not nameIsValid then color.isDanger
+                    ]
+                ]
+            ]
+            Bulma.column [
+                prop.children [
+                    Bulma.input.text [
+                        prop.value body
+                        prop.placeholder "expressão regular"
+                        prop.onChange
+                            (fun body ->
+                                (kind, name, body)
+                                |> SetRegularDefinition
+                                |> dispatch)
+                        if not regexpIsValid then color.isDanger
+                    ]
+                ]
+            ]
+            Bulma.column [
+                column.isNarrow
+                prop.children [ addButton ]
             ]
         ]
     ]
 
 let body (model: Model) (dispatch: Msg -> unit) =
+    let cardTitle (text: string) =
+        Bulma.cardHeaderTitle.p [
+            prop.text text
+            cardHeaderTitle.isCentered
+            size.isSize4
+            color.hasBackgroundGreyDark
+            color.hasTextGreyLighter
+        ]
+
     Bulma.columns [
         Bulma.column [
             Bulma.card [
-                Bulma.cardHeader [
-                    Bulma.cardHeaderTitle.p [
-                        prop.text "Definições Regulares"
-                        cardHeaderTitle.isCentered
-                        size.isSize4
-                        color.hasBackgroundInfoDark
-                        color.hasTextInfoLight
-                    ]
-                ]
+                Bulma.cardHeader [ cardTitle "Definições Regulares" ]
                 Bulma.cardContent [ regularDefinitions model dispatch ]
             ]
         ]
@@ -187,31 +298,17 @@ let body (model: Model) (dispatch: Msg -> unit) =
             Bulma.columns [
                 Bulma.column [
                     Bulma.card [
-                        Bulma.cardHeader [
-                            Bulma.cardHeaderTitle.p [
-                                prop.text "Entrada"
-                                cardHeaderTitle.isCentered
-                                size.isSize4
-                                color.hasBackgroundInfoDark
-                                color.hasTextInfoLight
-                            ]
-                        ]
+                        Bulma.cardHeader [ cardTitle "Entrada" ]
                         Bulma.cardContent [
-                            Bulma.textarea []
+                            Bulma.textarea [
+                                prop.onChange (SetInputText >> dispatch)
+                            ]
                         ]
                     ]
                 ]
                 Bulma.column [
                     Bulma.card [
-                        Bulma.cardHeader [
-                            Bulma.cardHeaderTitle.p [
-                                prop.text "Tabela de Símbolos"
-                                cardHeaderTitle.isCentered
-                                size.isSize4
-                                color.hasBackgroundInfoDark
-                                color.hasTextInfoLight
-                            ]
-                        ]
+                        Bulma.cardHeader [ cardTitle "Tabela de Símbolos" ]
                         Bulma.cardContent [
                             Bulma.table []
                         ]
@@ -222,35 +319,46 @@ let body (model: Model) (dispatch: Msg -> unit) =
     ]
 
 let toolbar (model: Model) (dispatch: Msg -> unit) =
-    let idInvalid = not (isValidId model.ProjectInterface.Id)
+    let idInvalid = not (isValidId model.Project.Id)
 
     Bulma.level [
-        level.isMobile
         prop.children [
             Bulma.levelLeft []
             Bulma.levelRight [
                 Bulma.levelItem [
-                    Bulma.text.p "projeto:"
+                    Bulma.text.p [
+                        text.hasTextWeightBold
+                        prop.text "projeto:"
+                    ]
                     Bulma.input.text [
-                        prop.value model.ProjectInterface.Id
+                        prop.value model.Project.Id
                         prop.onTextChange (SetProjectId >> dispatch)
                         prop.placeholder "identificador"
                     ]
                 ]
                 Bulma.levelItem [
-                    Bulma.button.button [
-                        prop.text "abrir"
-                        prop.disabled idInvalid
-                        prop.onClick (fun _ -> SetProjectId "abrir" |> dispatch ) // TODO
-                        color.isDanger
-                    ]
-                ]
-                Bulma.levelItem [
-                    Bulma.button.button [
-                        prop.text "salvar"
-                        prop.disabled idInvalid
-                        prop.onClick (fun _ -> SetProjectId "salvar" |> dispatch ) // TODO
-                        color.isDanger
+                    Bulma.columns [
+                        columns.isMobile
+                        prop.children [
+                            Bulma.column [
+                                Bulma.button.button [
+                                    prop.text "abrir"
+                                    prop.disabled idInvalid
+                                    prop.onClick
+                                        (fun _ -> SetProjectId "abrir" |> dispatch ) // TODO
+                                    color.isDanger
+                                ]
+                            ]
+                            Bulma.column [
+                                Bulma.button.button [
+                                    prop.text "salvar"
+                                    prop.disabled idInvalid
+                                    prop.onClick
+                                        (fun _ -> SetProjectId "salvar" |> dispatch ) // TODO
+                                    color.isDanger
+                                ]
+                            ]
+                        ]
                     ]
                 ]
             ]
