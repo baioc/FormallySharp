@@ -1,176 +1,148 @@
 module Index
 
 open Elmish
-open Fable.Remoting.Client
 
-open Shared
-open Feliz
-open Feliz.Bulma
+open Formally.Regular
 
-Fable.Core.JsInterop.importAll "./style.css"
+
+type LexerPart =
+    | Token of Regexp
+    | Fragment of Regexp
+
+type LexerSpec =
+    { RegularDefinitions: Map<string, LexerPart>
+      Separators: Set<Regexp> }
+
+type Project = { Id: string; Lexer: LexerSpec }
 
 
 type Model =
-    { RegularDefinitionText: string
-      TokenText: string
-      SimulationText: string
-      Outputs: Output list }
+    { ProjectInterface: Project
+      Error: string option }
 
 type Msg =
-    | SetRegularDefinitionText of string
-    | SetTokenText of string
-    | SetSimulationText of string
-    | GetOutput of Output list
-    | DoLexicalAnalysis
-    | FinishedLexicalAnalysis of Output list
-
-let api =
-    Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<IApi>
+    | SetProjectId of string
+    | AddRegularDefinition of string * LexerPart
+    | RemoveRegularDefinition of string
+    | AddSeparator of Regexp
+    | RemoveSeparator of Regexp
 
 let init () : Model * Cmd<Msg> =
+    let emptyProject =
+        { Id = ""
+          Lexer =
+              { RegularDefinitions = Map.empty
+                Separators = Set.empty } }
+
     let model =
-        { RegularDefinitionText = ""
-          TokenText = ""
-          SimulationText = ""
-          Outputs = [] }
+        { ProjectInterface = emptyProject
+          Error = None }
 
-    let cmd =
-        // Cmd.OfAsync.perform api.getOutputs () GetOutput
-        Cmd.none
-
-    model, cmd
+    model, Cmd.none
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | SetRegularDefinitionText value ->
-        { model with 
-            RegularDefinitionText = value }, Cmd.none
-    | SetTokenText value -> 
-        { model with 
-            TokenText = value }, Cmd.none
-    | SetSimulationText value -> 
-        { model with 
-            SimulationText = value }, Cmd.none
-    | GetOutput outputs ->
+    | SetProjectId id ->
         { model with
-              Outputs = outputs }, Cmd.none
-    | DoLexicalAnalysis ->
-        let input = Input.create(model.RegularDefinitionText, model.TokenText, model.SimulationText)
-        let cmd = Cmd.OfAsync.perform api.setInput input FinishedLexicalAnalysis
+              ProjectInterface = { model.ProjectInterface with Id = id } },
+        Cmd.none
+
+    | AddRegularDefinition (id, def) ->
+        let project = model.ProjectInterface
+        let lexer = project.Lexer
+        let regularDefinitions = lexer.RegularDefinitions
+
         { model with
-            RegularDefinitionText = "Retorno visual pra saber se foi" }, cmd
-    | FinishedLexicalAnalysis outputs->
+              ProjectInterface =
+                  { project with
+                        Lexer =
+                            { lexer with
+                                  RegularDefinitions = Map.add id def regularDefinitions } } },
+        Cmd.none
+
+    | RemoveRegularDefinition id ->
+        let project = model.ProjectInterface
+        let lexer = project.Lexer
+        let regularDefinitions = lexer.RegularDefinitions
+
         { model with
-              Outputs = outputs }, Cmd.none
+              ProjectInterface =
+                  { project with
+                        Lexer =
+                            { lexer with
+                                  RegularDefinitions = Map.remove id regularDefinitions } } },
+        Cmd.none
+
+    | AddSeparator regex ->
+        let project = model.ProjectInterface
+        let lexer = project.Lexer
+        let separators = lexer.Separators
+
+        { model with
+              ProjectInterface =
+                  { project with
+                        Lexer =
+                            { lexer with
+                                  Separators = Set.add regex separators } } },
+        Cmd.none
+
+    | RemoveSeparator regex ->
+        let project = model.ProjectInterface
+        let lexer = project.Lexer
+        let separators = lexer.Separators
+
+        { model with
+              ProjectInterface =
+                  { project with
+                        Lexer =
+                            { lexer with
+                                  Separators = Set.remove regex separators } } },
+        Cmd.none
 
 
+open Feliz
+open Feliz.Bulma
 
-
-
-// View
-let regularDefinitionBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div [
-        Bulma.textarea [
-            prop.rows 20
-            prop.value model.RegularDefinitionText
-            prop.placeholder "Informe as expressões regulares"
-            prop.onChange (fun x -> SetRegularDefinitionText x |> dispatch)
-        ]
-    ]
-
-let tokensBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div [
-        Bulma.textarea [
-            prop.rows 20
-            prop.value model.TokenText
-            prop.placeholder "Informe os tokens"
-            prop.onChange (fun x -> SetTokenText x |> dispatch)
-        ]
-    ]
-
-let simulatorBox (model: Model) (dispatch: Msg -> unit) =
-    Html.div [
-        Bulma.textarea [
-            prop.rows 20
-            prop.value model.SimulationText
-            prop.placeholder "Insira o texto para simulação"
-            prop.onChange (fun x -> SetSimulationText x |> dispatch)
-        ]
-    ]
-
-let tableOutput (model: Model) (dispatch: Msg -> Unit) =
-    Html.table [
-        Html.thead [
-            Html.tr [
-                Html.th "Token"
-                Html.th "Lexema"
-                Html.th "Posição"
-            ]
-        ]
-        Html.tbody [
-            for output in model.Outputs do
-                Html.tr [
-                    Html.td output.Token
-                    Html.td output.Lexema
-                    Html.td output.Posicao
-                ]
-        ]
-    ]
+let body model dispatch =
+    Bulma.title "test"
 
 let view (model: Model) (dispatch: Msg -> unit) =
-    Bulma.hero [
-        hero.isFullHeight
-        prop.children [
-            Bulma.heroBody [
-                Bulma.container [
-                    Bulma.columns [
-                        Bulma.column [
-                            prop.className "column-odd"
-                            prop.children [
-                                Bulma.title [
-                                    text.hasTextCentered
-                                    prop.text "Definição Regular"
-                                ]
-                                regularDefinitionBox model dispatch
-                            ]
-                        ]
-                        Bulma.column [
-                            prop.className "column-odd"
-                            prop.children [
-                                Bulma.title [
-                                    text.hasTextCentered
-                                    prop.text "Tokens"
-                                ]
-                                tokensBox model dispatch
-                            ]
-                        ]
-                        Bulma.column [
-                            prop.className "column-odd"
-                            prop.children [
-                                Bulma.title [
-                                    text.hasTextCentered
-                                    prop.text "Simulador"
-                                ]
-                                simulatorBox model dispatch
-                            ]
-                        ]
-                    ]
-                    Html.hr []
-                    Bulma.container [
-                        Bulma.button.a [
-                            color.isDark
-                            prop.text "Analisador Léxico"
-                            prop.onClick (fun _ -> dispatch DoLexicalAnalysis)
-                        ]
-                        tableOutput model dispatch
-                    ]
+    let repoUrl = "https://github.com/baioc/FormallySharp"
 
+    Html.body [
+        Bulma.navbar [
+            color.isPrimary
+            prop.style [ style.padding (length.rem 1) ]
+            prop.children [
+                Bulma.navbarBrand.div [
+                    Bulma.title [
+                        prop.text "Formally#"
+                        title.is1
+                    ]
                 ]
-
+                Bulma.navbarMenu [
+                    Bulma.navbarEnd.div [
+                        Bulma.navbarItem.a [
+                            prop.className "fab fa-github"
+                            prop.href repoUrl
+                            size.isSize3
+                        ]
+                    ]
+                ]
             ]
-
         ]
-
+        Bulma.section [ body model dispatch ]
+        Bulma.footer [
+            prop.style [
+                style.paddingTop (length.rem 1.5)
+                style.paddingBottom (length.rem 1.5)
+            ]
+            prop.children [
+                Html.a [
+                    prop.text "Trabalho para a disciplina de Linguagens Formais e Compiladores (INE5421)"
+                    prop.href repoUrl
+                ]
+                Html.p "© 2021 Gabriel B. Sant'Anna, Marcelo Contin, João Vitor"
+            ]
+        ]
     ]
