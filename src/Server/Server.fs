@@ -18,6 +18,8 @@ type Storage() =
 
     let mutable tokensMap = Map.empty
 
+    let simulationArray = ResizeArray<_>()
+
     member __.GetOutputs() = 
         List.ofSeq outputs
 
@@ -44,6 +46,15 @@ type Storage() =
     member __.PutToken(token: string, regex: Regexp) =
         tokensMap <- Map.add token regex tokensMap
 
+    member __.ContainsToken(key: string) = 
+        Map.containsKey key tokensMap
+
+    member __.GetToken(key: string) = 
+        Map.find key tokensMap
+
+    member __.AddSimulationArray(word: string) =
+        simulationArray.Add word
+        Ok()
 
 
 let storage = Storage()
@@ -84,6 +95,23 @@ let api =
                     for token in tokens do
                         let key, value = Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
                         storage.PutToken(key, value)
+                    let keyWords = List.ofArray(System.String.Concat(input.TokenKeyWord.Split(' ')).Split('\n'))
+                    for keyWord in keyWords do
+                        let key, value = Converter.convertRegularDefinitionTextToRegexp(keyWord)
+                        if(storage.ContainsToken(key)) then
+                            let mutable newValue = Regexp.empty
+                            newValue <- (storage.GetToken(key) + value)
+                            storage.PutToken(key, newValue)
+                        else
+                            storage.PutToken(key, value)
+                    let skipWords = List.ofArray(System.String.Concat(input.TokenIgnore.Split(' ')).Split('\n'))
+                    for skipWord in skipWords do
+                        let __, value = Converter.convertTokenToRegexp(skipWord, storage.GetRegularDefinitionsMap())
+                        let mutable key = "remove"
+                        storage.PutToken(key, value)
+                    let simulation = List.ofArray(System.String.Concat(input.Simulation.Split(' ')).Split('\n'))
+                    for word in simulation do
+                        storage.AddSimulationArray(word)
                     return storage.GetOutputs() 
                 }
     }
