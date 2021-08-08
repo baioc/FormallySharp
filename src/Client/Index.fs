@@ -42,33 +42,41 @@ type LexerPart =
 
 type LexerSpec =
     { RegularDefinitions: Map<string, LexerPart>
-      Separators: Set<UserRegexp> }
+      Delimiters: Set<UserRegexp> }
 
 type Project = { Id: string; Lexer: LexerSpec }
 
-let isValidId id = Regex.IsMatch(id, "\w+")
+module Project =
+    let isValidId id = Regex.IsMatch(id, "\w+")
 
-type SymbolTableEntry =
+type TokenInstance =
     { Token: string
       Lexeme: string
       Position: uint }
 
-type SymbolTable = SymbolTableEntry list
+type Lexer = obj // TODO
+
+module Lexer =
+    let tokenize (lexer: Lexer) (input: char seq) : TokenInstance seq =
+        null // TODO
 
 
 type Model =
     { Project: Project
       RegularDefinition: string * string * string // kind, name, regexp
       InputText: string
-      SymbolTable: SymbolTable }
+      SymbolTable: TokenInstance seq
+      Lexer: Lexer option }
 
 type Msg =
     | SetRegularDefinition of string * string * string
     | AddRegularDefinition of string * LexerPart
     | RemoveRegularDefinition of string
-    | AddSeparator of UserRegexp
-    | RemoveSeparator of UserRegexp
+    | AddDelimiter of UserRegexp
+    | RemoveDelimiter of UserRegexp
     | SetInputText of string
+    | GenerateLexer of LexerSpec
+    | GeneratedLexer of Lexer
     | SetProjectId of string
     | SaveProject of Project
     | LoadProject of string
@@ -80,13 +88,14 @@ let init () : Model * Cmd<Msg> =
         { Id = ""
           Lexer =
               { RegularDefinitions = Map.ofSeq [ ("ALPHA", Fragment (UserRegexp "[a-zA-Z_]")); ("ID", Token (UserRegexp "x") ); ]
-                Separators = set [ UserRegexp " \n\t" ] } }
+                Delimiters = set [ UserRegexp " \n\t" ] } }
 
     let model =
         { Project = emptyProject
           InputText = ""
           RegularDefinition = "token", "", ""
-          SymbolTable = [ { Token = "ID"; Lexeme = "x"; Position = 0u }; { Token = "LET"; Lexeme = "let"; Position = 16u }  ] }
+          SymbolTable = [ { Token = "ID"; Lexeme = "x"; Position = 0u }; { Token = "LET"; Lexeme = "let"; Position = 16u } ]
+          Lexer = None }
 
     model, Cmd.none
 
@@ -123,33 +132,60 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                                   RegularDefinitions = Map.remove id regularDefinitions } } },
         Cmd.none
 
-    | AddSeparator regexp ->
+    | AddDelimiter regexp ->
         let project = model.Project
         let lexer = project.Lexer
-        let separators = lexer.Separators
+        let delimiters = lexer.Delimiters
 
         { model with
               Project =
                   { project with
                         Lexer =
                             { lexer with
-                                  Separators = Set.add regexp separators } } },
+                                  Delimiters = Set.add regexp delimiters } } },
         Cmd.none
 
-    | RemoveSeparator regexp ->
+    | RemoveDelimiter regexp ->
         let project = model.Project
         let lexer = project.Lexer
-        let separators = lexer.Separators
+        let delimiters = lexer.Delimiters
 
         { model with
               Project =
                   { project with
                         Lexer =
                             { lexer with
-                                  Separators = Set.remove regexp separators } } },
+                                  Delimiters = Set.remove regexp delimiters } } },
         Cmd.none
 
-    | SetInputText text -> { model with InputText = text }, Cmd.none
+    | SetInputText text ->
+        { model with
+              InputText = text
+              SymbolTable =
+                if Option.isNone model.Lexer then model.SymbolTable
+                else Lexer.tokenize model.Lexer text },
+        Cmd.none
+
+    | GenerateLexer spec -> // TODO
+        let toastAlert =
+            ToastAlert("gerando lexer...")
+                .Position(AlertPosition.Center)
+                .ConfirmButton(false)
+                .Type(AlertType.Info)
+
+        model,
+        SweetAlert.Run(toastAlert)
+
+    | GeneratedLexer lexer ->
+        let toastAlert =
+            ToastAlert("lexer gerado com sucesso!")
+                .Position(AlertPosition.Center)
+                .ConfirmButton(true)
+                .Timeout(3000)
+                .Type(AlertType.Success)
+
+        { model with Lexer = Some lexer },
+        SweetAlert.Run(toastAlert)
 
     | SetProjectId id ->
         { model with
@@ -170,7 +206,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | LoadProject id -> // TODO
         let toastAlert =
             ToastAlert($"carregando projeto para \"{id}\"...")
-                .Position(AlertPosition.Top)
+                .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
 
@@ -180,7 +216,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | LoadedProject project ->
         let toastAlert =
             ToastAlert($"projeto para \"{project.Id}\" foi carregado")
-                .Position(AlertPosition.Center)
+                .Position(AlertPosition.Top)
                 .ConfirmButton(true)
                 .Timeout(5000)
                 .Type(AlertType.Success)
@@ -189,21 +225,21 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         SweetAlert.Run(toastAlert)
 
 
-let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
+let project (model: Model) (dispatch: Msg -> unit) =
     let token = "token"
     let fragment = "fragmento"
-    let separator = "separador"
+    let delimiter = "separador"
 
     let kind, name, body = model.RegularDefinition
     let regexp = Regexp.tryParse body
-    let isSep = kind = separator
+    let isDelimiter = kind = delimiter
 
-    let nameIsValid = isSep || isValidId name
+    let nameIsValid = isDelimiter || Project.isValidId name
     let regexpIsValid = Option.isSome regexp
 
     let buttonEnabled = nameIsValid && regexpIsValid
     let willOverwrite =
-        (not isSep) && Map.containsKey name model.Project.Lexer.RegularDefinitions
+        (not isDelimiter) && Map.containsKey name model.Project.Lexer.RegularDefinitions
 
     let addButton =
         Bulma.button.a [
@@ -211,9 +247,9 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
             prop.disabled (not buttonEnabled)
             prop.onClick
                 (fun _ ->
-                    if kind = separator then
+                    if kind = delimiter then
                         UserRegexp(body, Option.get regexp)
-                        |> AddSeparator
+                        |> AddDelimiter
                         |> dispatch
                     elif kind = token then
                         (name, Token <| UserRegexp(body, Option.get regexp))
@@ -232,7 +268,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
             match regDef with
             | Choice1Of2 (Token regexp) -> token, regexp
             | Choice1Of2 (Fragment regexp) -> fragment, regexp
-            | Choice2Of2 separatorRegexp -> separator, separatorRegexp
+            | Choice2Of2 delimiterRegexp -> delimiter, delimiterRegexp
 
         Bulma.columns [
             columns.isVCentered
@@ -281,7 +317,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
                                         |> dispatch
                                     | Choice2Of2 sep ->
                                         sep
-                                        |> RemoveSeparator
+                                        |> RemoveDelimiter
                                         |> dispatch)
                         ]
                     ]
@@ -293,7 +329,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
         Bulma.content [
             for regDef in model.Project.Lexer.RegularDefinitions do
                 viewRegularDefinition (Some regDef.Key) (Choice1Of2 regDef.Value)
-            for regexp in model.Project.Lexer.Separators do
+            for regexp in model.Project.Lexer.Delimiters do
                 viewRegularDefinition None (Choice2Of2 regexp)
         ]
         Bulma.columns [
@@ -307,7 +343,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
                             prop.children [
                                 Html.option token
                                 Html.option fragment
-                                Html.option separator
+                                Html.option delimiter
                             ]
                             prop.value kind
                             prop.onChange
@@ -324,7 +360,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
                         Bulma.input.text [
                             prop.value name
                             prop.placeholder "nome"
-                            prop.disabled isSep
+                            prop.disabled isDelimiter
                             prop.onChange
                                 (fun (name: string) ->
                                     (kind, name.ToUpperInvariant(), body)
@@ -354,6 +390,77 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
                 ]
             ]
         ]
+
+        let hasToken =
+            Map.exists
+                (fun name part ->
+                    match part with
+                    | Token _ -> true
+                    | _ -> false)
+                model.Project.Lexer.RegularDefinitions
+        Bulma.level [
+            Bulma.levelItem [
+                Bulma.button.button [
+                    prop.text (if hasToken then "Gerar Lexer" else "Defina ao menos um token")
+                    prop.disabled (not hasToken)
+                    prop.onClick (fun _ -> GenerateLexer model.Project.Lexer |> dispatch )
+                    button.isLarge
+                    if hasToken then color.isPrimary else color.isWarning
+                ]
+            ]
+        ]
+    ]
+
+let simulation (model: Model) (dispatch: Msg -> unit) =
+    let hasLexer = Option.isSome model.Lexer
+    Bulma.columns [
+        Bulma.column [
+            Bulma.textarea [
+                prop.onChange (SetInputText >> dispatch)
+                prop.disabled (not hasLexer)
+                prop.placeholder  (if hasLexer then "Forneça uma entrada ao lexer."
+                                   else "O lexer ainda não foi gerado." )
+            ]
+        ]
+        Bulma.column [
+            Bulma.table [
+                table.isFullWidth
+                table.isHoverable
+                table.isBordered
+                prop.children [
+                    Html.thead [
+                        Html.tr [
+                            Html.th [
+                                prop.text "Token"
+                                text.hasTextCentered
+                            ]
+                            Html.th [
+                                prop.text "Lexema"
+                                text.hasTextCentered
+                            ]
+                            Html.th [
+                                prop.text "Posição"
+                                text.hasTextCentered
+                            ]
+                        ]
+                    ]
+                    Html.tbody [
+                        for entry in model.SymbolTable do
+                            Html.tr [
+                                Html.td [
+                                    prop.text entry.Token
+                                    color.hasTextInfo
+                                ]
+                                Html.td entry.Lexeme
+                                Html.td [
+                                    prop.text (string entry.Position)
+                                    color.hasTextLink
+                                ]
+                            ]
+                    ]
+                ]
+            ]
+        ]
     ]
 
 let main (model: Model) (dispatch: Msg -> unit) =
@@ -368,68 +475,14 @@ let main (model: Model) (dispatch: Msg -> unit) =
 
     let projectInterface =
         Bulma.card [
-            Bulma.cardHeader [ cardTitle "Definições Regulares" ]
-            Bulma.cardContent [ regularDefinitions model dispatch ]
+            Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
+            Bulma.cardContent [ project model dispatch ]
         ]
 
-    let testInput =
+    let decisionInterface =
         Bulma.card [
-            Bulma.cardHeader [ cardTitle "Entrada" ]
-            Bulma.cardContent [
-                Bulma.textarea [
-                    prop.onChange (SetInputText >> dispatch)
-                ]
-            ]
-        ]
-
-    let testOutput =
-        Bulma.card [
-            Bulma.cardHeader [ cardTitle "Tabela de Símbolos" ]
-            Bulma.cardContent [
-                prop.style [ style.padding (length.rem 0) ]
-                prop.children [
-                    Bulma.table [
-                        table.isFullWidth
-                        table.isHoverable
-                        table.isBordered
-                        prop.style [
-                            style.padding (length.rem 0)
-                        ]
-                        prop.children [
-                            Html.thead [
-                                Html.tr [
-                                    Html.th [
-                                        prop.text "Token"
-                                        text.hasTextCentered
-                                    ]
-                                    Html.th [
-                                        prop.text "Lexema"
-                                        text.hasTextCentered
-                                    ]
-                                    Html.th [
-                                        prop.text "Posição"
-                                        text.hasTextCentered
-                                    ]
-                                ]
-                            ]
-                            Html.tbody [
-                                for entry in model.SymbolTable do
-                                    Html.tr [
-                                        Html.td [
-                                            prop.text entry.Token
-                                            color.hasTextInfo
-                                        ]
-                                        Html.td entry.Lexeme
-                                        Html.td [
-                                            prop.text (string entry.Position)
-                                            color.hasTextLink
-                                        ]
-                                    ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+            Bulma.cardHeader [ cardTitle "Reconhecimento" ]
+            Bulma.cardContent [ simulation model dispatch ]
         ]
 
     Bulma.tile [
@@ -445,24 +498,11 @@ let main (model: Model) (dispatch: Msg -> unit) =
                 ]
             ]
             Bulma.tile [
+                tile.isParent
                 prop.children [
                     Bulma.tile [
-                        tile.isParent
-                        prop.children [
-                            Bulma.tile [
-                                tile.isChild
-                                prop.children [ testInput ]
-                            ]
-                        ]
-                    ]
-                    Bulma.tile [
-                        tile.isParent
-                        prop.children [
-                            Bulma.tile [
-                                tile.isChild
-                                prop.children [ testOutput ]
-                            ]
-                        ]
+                        tile.isChild
+                        prop.children [ decisionInterface ]
                     ]
                 ]
             ]
@@ -470,7 +510,7 @@ let main (model: Model) (dispatch: Msg -> unit) =
     ]
 
 let toolbar (model: Model) (dispatch: Msg -> unit) =
-    let idInvalid = not (isValidId model.Project.Id)
+    let idInvalid = not (Project.isValidId model.Project.Id)
 
     Bulma.level [
         prop.children [
@@ -483,12 +523,12 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                 Bulma.tab [
                                     tab.isActive
                                     prop.children [
-                                        Html.a [ prop.text "léxico" ]
+                                        Html.a [ prop.text "Lexicon" ]
                                     ]
                                 ]
                                 Bulma.tab [
                                     prop.children [
-                                        Html.a [ prop.text "sintático" ]
+                                        Html.a [ prop.text "Sintaxe" ]
                                     ]
                                 ]
                             ]
@@ -508,7 +548,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                 prop.children [
                                     Bulma.text.p [
                                         text.hasTextWeightBold
-                                        prop.text "projeto:"
+                                        prop.text "Projeto:"
                                     ]
                                 ]
                             ]
