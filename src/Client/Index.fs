@@ -8,6 +8,8 @@ open Feliz.Bulma
 
 open Formally.Regular
 
+Fable.Core.JsInterop.importAll "./style.css"
+
 
 module Regexp =
     let tryParse s =
@@ -18,13 +20,13 @@ module Regexp =
 /// Regexp with a user-facing string representation.
 type UserRegexp =
     struct
-        val Regexp : Regexp
-        val private Text : string
+        val Regexp: Regexp
+        val private Text: string
 
-        new(text: string) =
+        new(text) =
             UserRegexp(text, Regexp.tryParse text |> Option.get)
 
-        new(text: string, regexp: Regexp) =
+        new(text, regexp) =
             { Text = text; Regexp = regexp }
 
         override this.ToString() =
@@ -91,7 +93,8 @@ let init () : Model * Cmd<Msg> =
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | SetRegularDefinition (kind, name, body) ->
-        { model with RegularDefinition = kind, name, body },
+        { model with
+              RegularDefinition = kind, name, body },
         Cmd.none
 
     | AddRegularDefinition (id, def) ->
@@ -146,9 +149,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                                   Separators = Set.remove regexp separators } } },
         Cmd.none
 
-    | SetInputText text ->
-        { model with InputText = text },
-        Cmd.none
+    | SetInputText text -> { model with InputText = text }, Cmd.none
 
     | SetProjectId id ->
         { model with
@@ -162,6 +163,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .ConfirmButton(false)
                 .Timeout(3000)
                 .Type(AlertType.Success)
+
         model,
         SweetAlert.Run(toastAlert)
 
@@ -171,6 +173,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .Position(AlertPosition.Top)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
+
         model,
         SweetAlert.Run(toastAlert)
 
@@ -230,6 +233,7 @@ let regularDefinitions (model: Model) (dispatch: Msg -> unit) =
             | Choice1Of2 (Token regexp) -> token, regexp
             | Choice1Of2 (Fragment regexp) -> fragment, regexp
             | Choice2Of2 separatorRegexp -> separator, separatorRegexp
+
         Bulma.columns [
             columns.isVCentered
             columns.isMobile
@@ -387,15 +391,25 @@ let main (model: Model) (dispatch: Msg -> unit) =
                     Bulma.table [
                         table.isFullWidth
                         table.isHoverable
+                        table.isBordered
                         prop.style [
                             style.padding (length.rem 0)
                         ]
                         prop.children [
                             Html.thead [
                                 Html.tr [
-                                    Html.th "Token"
-                                    Html.th "Lexema"
-                                    Html.th "Posição"
+                                    Html.th [
+                                        prop.text "Token"
+                                        text.hasTextCentered
+                                    ]
+                                    Html.th [
+                                        prop.text "Lexema"
+                                        text.hasTextCentered
+                                    ]
+                                    Html.th [
+                                        prop.text "Posição"
+                                        text.hasTextCentered
+                                    ]
                                 ]
                             ]
                             Html.tbody [
@@ -405,9 +419,7 @@ let main (model: Model) (dispatch: Msg -> unit) =
                                             prop.text entry.Token
                                             color.hasTextInfo
                                         ]
-                                        Html.td [
-                                            prop.text entry.Lexeme
-                                        ]
+                                        Html.td entry.Lexeme
                                         Html.td [
                                             prop.text (string entry.Position)
                                             color.hasTextLink
@@ -471,16 +483,12 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                 Bulma.tab [
                                     tab.isActive
                                     prop.children [
-                                        Html.a [
-                                            prop.text "léxico"
-                                        ]
+                                        Html.a [ prop.text "léxico" ]
                                     ]
                                 ]
                                 Bulma.tab [
                                     prop.children [
-                                        Html.a [
-                                            prop.text "sintático"
-                                        ]
+                                        Html.a [ prop.text "sintático" ]
                                     ]
                                 ]
                             ]
@@ -520,7 +528,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                         prop.text "abrir"
                                         prop.disabled idInvalid
                                         prop.onClick
-                                            (fun _ -> LoadProject model.Project.Id |> dispatch )
+                                            (fun _ -> LoadProject model.Project.Id |> dispatch)
                                         color.isDanger
                                     ]
                                 ]
@@ -532,7 +540,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                         prop.text "salvar"
                                         prop.disabled idInvalid
                                         prop.onClick
-                                            (fun _ -> SaveProject model.Project |> dispatch )
+                                            (fun _ -> SaveProject model.Project |> dispatch)
                                         color.isDanger
                                     ]
                                 ]
@@ -607,8 +615,4 @@ let view (model: Model) (dispatch: Msg -> unit) =
             ]
         ]
 
-    Html.body [
-        header
-        body
-        footer
-    ]
+    Html.body [ header; body; footer ]
