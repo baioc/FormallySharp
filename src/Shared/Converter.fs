@@ -13,7 +13,10 @@ module Converter =
         let mutable parenthesesDetected = false
         for i = 0 to (expressions.Count - 1) do
             if (expressions.[i] <> Regexp.ofChar('(') && expressions.[i] <> Regexp.ofChar(')') && expressions.[i] <> Regexp.ofChar('*') && expressions.[i] <> Regexp.ofChar('|') && not(parenthesesDetected)) then
-                value <- value * expressions.[i]
+                if (value = Regexp.empty) then
+                    value <- expressions.[i]
+                else 
+                    value <- value * expressions.[i]
             elif (expressions.[i]=(Regexp.ofChar('('))) then
                 parenthesesDetected <- true
                 start <- i
@@ -48,9 +51,15 @@ module Converter =
                             insideRegex <- insideRegex * item
                 pipeDetected <- false
                 if (isKleeneClosure && expressions.[i+1]=(Regexp.ofChar('*'))) then
-                    value <- value * (!* insideRegex)
+                    if (value = Regexp.empty) then
+                        value <- (!* insideRegex)
+                    else
+                        value <- value * (!* insideRegex)
                 else
-                    value <- value * insideRegex
+                    if (value = Regexp.empty) then
+                        value <- insideRegex
+                    else
+                        value <- value * insideRegex
                 parenthesesDetected <- false
         value
 
@@ -62,10 +71,9 @@ module Converter =
         let mutable finish = 0
         let mutable setDetected = false
         let mutable bracketDetected = false
-
         let text = List.ofArray(regularDefinition.Split(':'))
         key <- text.Head // key = "L"
-        let regularExpression = text.Item(1) // regularExpression = "a[A-Za-z]b(aba|c)*c"
+        let regularExpression = "(" + text.Item(1) + ")" // regularExpression = "a[A-Za-z]b(aba|c)*c"
         for i = 0 to (regularExpression.Length - 1) do
             if (regularExpression.[i] <> '[' && regularExpression.[i] <> ']' && not(setDetected)) then
                 expressions.Add(Regexp.ofChar(regularExpression.[i]))
@@ -81,13 +89,12 @@ module Converter =
                     if (regularSet.[i]=('-')) then
                         temp.Add(Regexp.ofSet([regularSet.[i-1] .. regularSet.[i+1]]))
                 for item in temp do
-                    if (item=(Regexp.empty)) then
+                    if (tempRegex=(Regexp.empty)) then
                         tempRegex <- item
                     else 
                         tempRegex <- tempRegex + item
                 expressions.Add(tempRegex)
                 setDetected <- false
-
         let mutable positionsStartParentheses = ResizeArray<int>()
         let mutable positionsEndParentheses = ResizeArray<int>()
         let mutable isParentheses = true
@@ -105,7 +112,12 @@ module Converter =
             positionKleeneToRemove <- 99999999
             isKleeneClosure <- false
             newExpressions <- ResizeArray<Regexp>()
-            for i=positionsStartParentheses.[positionsStartParentheses.Count - 1] to positionsEndParentheses.[0] do
+            let mutable startFor = positionsStartParentheses.[positionsStartParentheses.Count - 1]
+            let mutable endFor = 0
+            for i = 0 to (positionsEndParentheses.Count - 1) do
+                if (positionsEndParentheses.[i] > startFor && endFor = 0) then
+                    endFor <- positionsEndParentheses.[i]
+            for i = startFor to endFor do
                 newExpressions.Add(expressions.[i])
                 if (i+1 <= expressions.Count-1 && expressions.[i+1] = Regexp.ofChar('*')) then
                     newExpressions.Add(expressions.[i+1])
@@ -114,10 +126,10 @@ module Converter =
             let mutable value2 = getRegexFromParenthesesString(newExpressions, isKleeneClosure)
             newExpressions <- expressions
             expressions <- ResizeArray<Regexp>()
-            for i=0 to positionsStartParentheses.[positionsStartParentheses.Count - 1]-1 do
+            for i=0 to startFor-1 do
                 expressions.Add(newExpressions.[i])
             expressions.Add(value2)
-            for i=positionsEndParentheses.[0]+1 to newExpressions.Count - 1 do
+            for i=endFor+1 to newExpressions.Count - 1 do 
                 if (i <> positionKleeneToRemove) then
                     expressions.Add(newExpressions.[i])
             positionsStartParentheses <- ResizeArray<int>()
@@ -130,19 +142,8 @@ module Converter =
             if (positionsStartParentheses.Count = 0) then
                 isParentheses <- false
         if (expressions.Count = 1) then
-            value <- expressions.[0]
-        else
-            // TODO: passar expression para o value. Considerar concatenação com algo fora do parenteses a direita ainda
-            // como para o caso teste : ( {L} ( {L} | {D} ) )* | {D}
-            value <- expressions.[0]
+            value <- value * expressions.[0]
         key, value
-                
-
-
-
-    
-        
-
 
     let convertTokenToRegexp(tokenText: string, regularDefinitionsMap: Map<string, string>) = // id: {L} ({L} | {D})*
         let mutable start = 0

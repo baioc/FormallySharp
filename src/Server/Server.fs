@@ -111,7 +111,7 @@ let api =
                         storage.PutToken(key, value)
                     let simulation = List.ofArray(System.String.Concat(input.Simulation.Split(' ')).Split('\n'))
                     for word in simulation do
-                        storage.AddSimulationArray(word)
+                        storage.AddSimulationArray(word) |> ignore
                     return storage.GetOutputs() 
                 }
     }
