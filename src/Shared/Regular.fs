@@ -231,6 +231,11 @@ module Nfa =
           Current = Set.map stateMapping nfa.Current
           Accepting = Set.map stateMapping nfa.Accepting }
 
+    /// Transforms an NFA by filtering its transitions.
+    let filter transitionFilter (nfa: Nfa<_>) =
+        { nfa with
+            Transitions = Map.filter transitionFilter nfa.Transitions }
+
     /// Discriminated union of two NFAs through epsilon transitions.
     let union a b =
         // we need to discriminate states from each NFA in order to maintain their structures,
@@ -324,6 +329,22 @@ module Nfa =
 
 [<RequireQualifiedAccess>]
 module Dfa =
+    /// Transforms a DFA by applying a function over all of its states.
+    let map stateMapping dfa =
+        { Dead = stateMapping dfa.Dead
+          Transitions =
+              Map.toSeq dfa.Transitions
+              |> Seq.map (fun ((q, a), q') -> (stateMapping q, a), stateMapping q')
+              |> Map.ofSeq
+          Current = stateMapping dfa.Current
+          Accepting = Set.map stateMapping dfa.Accepting }
+
+    /// Transforms a DFA by filtering its transitions.
+    // TODO: test this, as well as the NFA filter
+    let filter transitionFilter (dfa: Dfa<_>) =
+        { dfa with
+            Transitions = Map.filter transitionFilter dfa.Transitions }
+
     let toNfa = Nfa.ofDfa
     let ofNfa = Nfa.toDfa
 

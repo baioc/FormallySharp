@@ -40,9 +40,9 @@ let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
           Lexer =
-              Map.ofSeq [ "ALPHA", Fragment(UserRegexp "[a-zA-Z_]")
-                          "ID", Token(UserRegexp "x", 0)
-                          "WS", Separator(UserRegexp " \n\t") ] }
+              Map.ofSeq [ "ALPHA", Fragment (UserRegexp "[a-zA-Z_]")
+                          "ID", Token (UserRegexp "x", 0)
+                          "WS", Separator (UserRegexp " \n\t") ] }
 
     let model =
         { Project = emptyProject
@@ -195,12 +195,12 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
             |> Array.partition
                 (fun (_, (_, p)) -> if delta > 0 then p <= priority else p < priority)
         // add up the arrays, with the moved token in the middle
-        Array.concat [ lower; [| name, (Token(regexp, priority), priority) |]; higher ]
+        Array.concat [ lower; [| name, (Token (regexp, priority), priority) |]; higher ]
         // re-evaluate priorities based on their resulting index
         |> Seq.mapi
             (fun priority (name, (def, _)) ->
                 match def with
-                | Token (regexp, _) -> name, Token(regexp, priority)
+                | Token (regexp, _) -> name, Token (regexp, priority)
                 | def -> name, def)
         |> Map.ofSeq
 
@@ -217,7 +217,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     if kind = tokenOption then
                         match Map.tryFind name spec with
                         | Some (Token (_, priority)) ->
-                            let token = Token(regexp, priority)
+                            let token = Token (regexp, priority)
                             Map.add name token spec
                         | _ -> moveToken name regexp 0
                         |> ChangeRegularDefinitions
