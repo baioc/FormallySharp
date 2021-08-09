@@ -9,31 +9,16 @@ open Shared
 
 
 let api =
-    { generateLexer =
-          fun spec ->
-              async {
-                  return failwith "TODO"
-              }
-
-      saveProject =
-          fun project ->
-              async {
-                  return failwith "TODO"
-              }
-
-      loadProject =
-          fun id ->
-              async {
-                  return failwith "TODO"
-              }
-    }
-
+    { generateLexer = fun spec -> async { return Lexer.make spec }
+      saveProject = fun project -> async { return failwith "TODO" }
+      loadProject = fun id -> async { return failwith "TODO" } }
 
 let webApp =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
+
 
 let routes = choose [ webApp ]
 

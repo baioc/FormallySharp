@@ -7,6 +7,7 @@ open Feliz
 open Feliz.Bulma
 
 open Shared
+open Formally.Regular
 
 Fable.Core.JsInterop.importAll "./style.css"
 
@@ -15,7 +16,7 @@ type Model =
     { Project: Project
       RegularDefinitionText: string * string * string // kind, name, regexp
       Lexer: Lexer option
-      SymbolTable: TokenInstance seq
+      SymbolTable: Result<TokenInstance, LexicalError> seq
       InputText: string }
 
 type Msg =
@@ -29,6 +30,7 @@ type Msg =
     | SavedProject of Identifier
     | LoadProject of Identifier
     | LoadedProject of Project
+    | GotError of exn
 
 let api =
     Remoting.createApi ()
@@ -40,15 +42,17 @@ let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
           Lexer =
-              Map.ofSeq [ "ALPHA", Fragment (UserRegexp "[a-zA-Z_]")
-                          "ID", Token (UserRegexp "x", 0)
-                          "WS", Separator (UserRegexp " \n\t") ] }
+            Map.ofSeq [ "ALPHA", TokenClass (UserRegexp("ab|xx", Regexp.ofSeq "ab" + Regexp.ofSeq "xx"), 0)
+                        "ID", TokenClass (UserRegexp("xx", Regexp.ofSeq "xx"), 2)
+                        "NUM", TokenClass (UserRegexp("123", Regexp.ofSeq "123"), -1)
+                        "WS", Separator (UserRegexp " ") ] }
 
     let model =
         { Project = emptyProject
           Lexer = None
-          SymbolTable = [| { Token = "ID"; Lexeme = "x"; Position = 0u }
-                           { Token = "LET"; Lexeme = "let"; Position = 16u } |]
+          SymbolTable = [| Ok { Token = "ID"; Lexeme = "xx"; Position = 0u }
+                           Result.Error { String = "xxx"; Position = 666u }
+                           Ok { Token = "NUM"; Lexeme = "123"; Position = 16u } |]
           RegularDefinitionText = "token", "", ""
           InputText = "" }
 
@@ -75,8 +79,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         model,
         Cmd.batch [
-            Cmd.OfAsync.perform api.generateLexer spec GeneratedLexer
             SweetAlert.Run(toastAlert)
+            Cmd.OfAsync.either api.generateLexer spec GeneratedLexer GotError
         ]
 
     | GeneratedLexer lexer ->
@@ -113,8 +117,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         model,
         Cmd.batch [
-            Cmd.OfAsync.perform api.saveProject project (fun _ -> SavedProject project.Id)
             SweetAlert.Run(toastAlert)
+            Cmd.OfAsync.either api.saveProject project (fun _ -> SavedProject project.Id) GotError
         ]
 
     | SavedProject id ->
@@ -137,19 +141,29 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         model,
         Cmd.batch [
-            Cmd.OfAsync.perform api.loadProject id LoadedProject
             SweetAlert.Run(toastAlert)
+            Cmd.OfAsync.either api.loadProject id LoadedProject GotError
         ]
 
     | LoadedProject project ->
         let toastAlert =
             ToastAlert(sprintf "projeto para \"%s\" foi carregado" project.Id)
-                .Position(AlertPosition.Top)
+                .Position(AlertPosition.TopEnd)
                 .ConfirmButton(true)
                 .Timeout(5000)
                 .Type(AlertType.Success)
 
         { model with Project = project },
+        SweetAlert.Run(toastAlert)
+
+    | GotError ex ->
+        let toastAlert =
+            ToastAlert($"erro no servidor: {ex.Message}")
+                .Position(AlertPosition.Top)
+                .ConfirmButton(true)
+                .Type(AlertType.Error)
+
+        model,
         SweetAlert.Run(toastAlert)
 
 
@@ -171,7 +185,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 match def with
                 | Fragment _ -> -2, (name, def)
                 | Separator _ -> -1, (name, def)
-                | Token (_, p) -> p, (name, def)) // always >= 0
+                | TokenClass (_, p) -> p, (name, def)) // always >= 0
         |> Seq.sortBy fst
         |> Seq.mapi (fun newPrio (_, (name, def)) -> name, (def, newPrio))
         |> Map.ofSeq
@@ -195,12 +209,12 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
             |> Array.partition
                 (fun (_, (_, p)) -> if delta > 0 then p <= priority else p < priority)
         // add up the arrays, with the moved token in the middle
-        Array.concat [ lower; [| name, (Token (regexp, priority), priority) |]; higher ]
+        Array.concat [ lower; [| name, (TokenClass (regexp, priority), priority) |]; higher ]
         // re-evaluate priorities based on their resulting index
         |> Seq.mapi
             (fun priority (name, (def, _)) ->
                 match def with
-                | Token (regexp, _) -> name, Token (regexp, priority)
+                | TokenClass (regexp, _) -> name, TokenClass (regexp, priority)
                 | def -> name, def)
         |> Map.ofSeq
 
@@ -216,8 +230,8 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     // when editing a token, we want to maintain existing priority
                     if kind = tokenOption then
                         match Map.tryFind name spec with
-                        | Some (Token (_, priority)) ->
-                            let token = Token (regexp, priority)
+                        | Some (TokenClass (_, priority)) ->
+                            let token = TokenClass (regexp, priority)
                             Map.add name token spec
                         | _ -> moveToken name regexp 0
                         |> ChangeRegularDefinitions
@@ -239,7 +253,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
     let viewRegularDefinition name def =
         let kind, (regexp: UserRegexp) =
             match def with
-            | Token (regexp, _) -> tokenOption, regexp
+            | TokenClass (regexp, _) -> tokenOption, regexp
             | Fragment regexp -> fragmentOption, regexp
             | Separator regexp -> separatorOption, regexp
 
@@ -247,10 +261,12 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
             columns.isVCentered
             columns.isMobile
             columns.isMultiline
+            columns.isCentered
             prop.children [
                 // type
                 Bulma.column [
                     column.isOneFifthTablet
+                    prop.style [ style.paddingRight (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
                             prop.text kind
@@ -262,6 +278,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 // name
                 Bulma.column [
                     column.isOneFifthTablet
+                    prop.style [ style.padding (length.rem 0.0) ]
                     prop.children [
                         Bulma.text.p [
                             prop.text (name: string)
@@ -272,7 +289,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 ]
                 // user-facing regex string
                 Bulma.column [
-                    column.isThreeFifthsMobile
+                    prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
                             prop.text (string regexp)
@@ -282,13 +299,17 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 ]
                 // priority buttons, for tokens only
                 match def with
-                | Token (regexp, _) ->
+                | TokenClass (regexp, _) ->
                     Bulma.column [
                         column.isNarrow
                         prop.children [
                             Bulma.container [
                                 Bulma.icon [
                                     icon.isSmall
+                                    prop.style [
+                                        style.paddingRight (length.rem 0)
+                                        style.paddingLeft (length.rem 0.5)
+                                    ]
                                     prop.children [
                                         Html.a [
                                             prop.className "fas fa-angle-up"
@@ -302,6 +323,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                                 ]
                                 Bulma.icon [
                                     icon.isSmall
+                                    prop.style [ style.padding (length.rem 0) ]
                                     prop.children [
                                         Html.a [
                                             prop.className "fas fa-angle-down"
@@ -320,6 +342,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 // remove button
                 Bulma.column [
                     column.isNarrow
+                    prop.style [ style.paddingLeft (length.rem 0) ]
                     prop.children [
                         Bulma.delete [
                             prop.onClick
@@ -341,7 +364,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 match def with
                 | Fragment _ -> -2
                 | Separator _ -> -1
-                | Token _ -> maxPriority - prio)
+                | TokenClass _ -> maxPriority - prio)
         |> Seq.map (fun (name, (def, _)) -> name, def)
 
     Bulma.block [
@@ -354,9 +377,11 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
         Bulma.columns [
             columns.isMobile
             columns.isMultiline
+            columns.isCentered
             prop.children [
                 Bulma.column [
                     column.isNarrow
+                    prop.style [ style.paddingRight (length.rem 0) ]
                     prop.children [
                         Bulma.select [
                             prop.children [
@@ -374,7 +399,8 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     ]
                 ]
                 Bulma.column [
-                    column.isOneFifthTablet
+                    column.isOneFifthDesktop
+                    prop.style [ style.paddingRight (length.rem 0.5) ]
                     prop.children [
                         Bulma.input.text [
                             prop.value name
@@ -389,6 +415,8 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     ]
                 ]
                 Bulma.column [
+                    column.isHalfMobile
+                    prop.style [ style.paddingLeft (length.rem 0.5) ]
                     prop.children [
                         Bulma.input.text [
                             prop.value body
@@ -404,7 +432,8 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 ]
                 Bulma.column [
                     column.isNarrow
-                    prop.children [addRegularDefinitionButton]
+                    prop.style [ style.paddingLeft (length.rem 0) ]
+                    prop.children [ addRegularDefinitionButton ]
                 ]
             ]
         ]
@@ -422,53 +451,75 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
         ]
     ]
 
-let recognition (lexer: Lexer option) (symbolTable: TokenInstance seq) (dispatch: Msg -> unit) =
+let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, LexicalError> seq) (dispatch: Msg -> unit) =
     Bulma.columns [
         // input
-        Bulma.column [
-            Bulma.textarea [
-                prop.onChange (SetInputText >> dispatch)
-                prop.disabled (Option.isNone lexer)
-                prop.placeholder (if Option.isSome lexer then "Forneça uma entrada ao lexer."
-                                  else "O lexer ainda não foi gerado.")
-            ]
-        ]
-        // symbol table
-        Bulma.column [
-            Bulma.table [
-                table.isFullWidth
-                table.isHoverable
-                table.isBordered
+        columns.isMobile
+        columns.isMultiline
+        columns.isCentered
+        prop.children [
+            Bulma.column [
+                column.isHalfDesktop
+                column.isFullTablet
+                column.isFullMobile
                 prop.children [
-                    Html.thead [
-                        Html.tr [
-                            Html.th [
-                                prop.text "Token"
-                                text.hasTextCentered
-                            ]
-                            Html.th [
-                                prop.text "Lexema"
-                                text.hasTextCentered
-                            ]
-                            Html.th [
-                                prop.text "Posição"
-                                text.hasTextCentered
+                    Bulma.textarea [
+                        prop.custom ("rows", 24)
+                        prop.onChange (SetInputText >> dispatch)
+                        prop.disabled (Option.isNone lexer)
+                        prop.placeholder (if Option.isSome lexer then "Forneça uma entrada ao lexer."
+                                          else "O lexer ainda não foi gerado.")
+                    ]
+                ]
+            ]
+            // symbol table
+            Bulma.column [
+                column.isHalfDesktop
+                column.isFullTablet
+                column.isFullMobile
+                prop.children [
+                    Bulma.tableContainer [
+                        Bulma.table [
+                            table.isFullWidth
+                            table.isHoverable
+                            table.isBordered
+                            prop.children [
+                                Html.thead [
+                                    Html.tr [
+                                        Html.th [
+                                            prop.text "Token"
+                                            text.hasTextCentered
+                                        ]
+                                        Html.th [
+                                            prop.text "Lexema"
+                                            text.hasTextCentered
+                                        ]
+                                        Html.th [
+                                            prop.text "Posição"
+                                            text.hasTextCentered
+                                        ]
+                                    ]
+                                ]
+                                Html.tbody [
+                                    for entry in symbolTable do
+                                        let kind, string, position =
+                                            match entry with
+                                            | Ok token -> token.Token, token.Lexeme, token.Position
+                                            | Result.Error error -> "ERRO LÉXICO", error.String, error.Position
+                                        Html.tr [
+                                            Html.td [
+                                                prop.text kind
+                                                color.hasTextInfo
+                                            ]
+                                            Html.td (String.visual string)
+                                            Html.td [
+                                                prop.text (sprintf "%d" position)
+                                                color.hasTextLink
+                                            ]
+                                        ]
+                                ]
                             ]
                         ]
-                    ]
-                    Html.tbody [
-                        for entry in symbolTable do
-                            Html.tr [
-                                Html.td [
-                                    prop.text entry.Token
-                                    color.hasTextInfo
-                                ]
-                                Html.td entry.Lexeme
-                                Html.td [
-                                    prop.text (string entry.Position)
-                                    color.hasTextLink
-                                ]
-                            ]
                     ]
                 ]
             ]
@@ -497,29 +548,24 @@ let main (model: Model) (dispatch: Msg -> unit) =
             Bulma.cardContent [ recognition model.Lexer model.SymbolTable dispatch ]
         ]
 
-    Bulma.tile [
-        tile.isAncestor
+    Bulma.columns [
+        columns.isMobile
+        columns.isMultiline
+        columns.isCentered
         prop.children [
             // project interface
-            Bulma.tile [
-                tile.isParent
-                prop.children [
-                    Bulma.tile [
-                        tile.isChild
-                        prop.children [ projectInterface ]
-                    ]
-                ]
+            Bulma.column [
+                column.isHalfDesktop
+                column.isFullTablet
+                column.isFullMobile
+                prop.children [ projectInterface ]
             ]
             // exection interface
-            Bulma.tile [
-                tile.isParent
-                prop.children [
-                    // recognition test
-                    Bulma.tile [
-                        tile.isChild
-                        prop.children [ recognitionInterface ]
-                    ]
-                ]
+            Bulma.column [
+                column.isHalfDesktop
+                column.isFullTablet
+                column.isFullMobile
+                prop.children [ recognitionInterface ]
             ]
         ]
     ]
@@ -559,6 +605,7 @@ let toolbar (project: Project) (dispatch: Msg -> unit) =
                         columns.isVCentered
                         columns.isMobile
                         columns.isMultiline
+                        columns.isCentered
                         prop.children [
                             Bulma.column [
                                 column.isNarrow
@@ -570,6 +617,7 @@ let toolbar (project: Project) (dispatch: Msg -> unit) =
                                 ]
                             ]
                             Bulma.column [
+                                column.isThreeFifthsMobile
                                 prop.children [
                                     Bulma.input.text [
                                         prop.value project.Id
@@ -579,7 +627,8 @@ let toolbar (project: Project) (dispatch: Msg -> unit) =
                                 ]
                             ]
                             Bulma.column [
-                                column.isNarrow
+                                column.isNarrowTablet
+                                column.isOneQuarterMobile
                                 prop.children [
                                     Bulma.button.button [
                                         prop.text "abrir"
@@ -590,7 +639,8 @@ let toolbar (project: Project) (dispatch: Msg -> unit) =
                                 ]
                             ]
                             Bulma.column [
-                                column.isNarrow
+                                column.isNarrowTablet
+                                column.isOneQuarterMobile
                                 prop.children [
                                     Bulma.button.button [
                                         prop.text "salvar"
