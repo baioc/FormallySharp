@@ -1,63 +1,40 @@
 module Server
 
+open Giraffe
+open Saturn
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
-open Saturn
-open Giraffe
+open LiteDB
+open LiteDB.FSharp
+open LiteDB.FSharp.Extensions
 
 open Shared
 
 
+/// Server-side storage. Use with parsimony.
 type Storage() =
-    let outputs = ResizeArray<_>()
+    let database =
+        let mapper = FSharpBsonMapper()
+        let connStr = "Filename=FormallySharp.db;mode=Exclusive"
+        new LiteDatabase(connStr, mapper)
 
-    let mutable input = Input.create("","","")
+    let projects = database.GetCollection<Project> "projects"
 
-    member __.GetOutputs() = 
-        List.ofSeq outputs
+    /// Retrieves a project by its identifier.
+    member __.GetProject(id) =
+        projects.findOne <@ fun project -> project.Id = id @>
 
-    member __.AddOutput(output: Output) =
-        outputs.Add output
-        Ok()
-
-    member __.SetInput(input1: Input) = 
-        input <- input1
-        Ok()
-
+    /// Saves a project to the database. Always overwrites.
+    member __.SaveProject(project: Project) =
+        projects.Insert(project)
 
 let storage = Storage()
 
-storage.AddOutput(Output.create ("a", "a", 1))
-|> ignore
-
-storage.AddOutput(Output.create ("b", "b", 2))
-|> ignore
-
-storage.AddOutput(Output.create ("c", "c", 3))
-|> ignore
 
 let api =
-    { getOutputs = 
-            fun () -> 
-                async { 
-                    return storage.GetOutputs() 
-                }
-
-      addOutput =
-            fun output ->
-                async {
-                    match storage.AddOutput output with
-                    | Ok () -> return output
-                    | Error e -> return failwith e
-                } 
-
-      setInput = 
-            fun input ->
-                async {
-                    storage.SetInput(input)
-                    return storage.GetOutputs() 
-                }
-    }
+    { generateLexer = fun spec -> async { return Lexer.make spec }
+      saveProject = fun project -> async { return storage.SaveProject(project) |> ignore }
+      loadProject = fun id -> async { return storage.GetProject(id) } }
 
 let webApp =
     Remoting.createApi ()
@@ -65,11 +42,14 @@ let webApp =
     |> Remoting.fromValue api
     |> Remoting.buildHttpHandler
 
+
+let routes = choose [ webApp ]
+
 let app =
     application {
         url "http://0.0.0.0:8085"
         use_static "public"
-        use_router webApp
+        use_router routes
         use_gzip
         memory_cache
     }

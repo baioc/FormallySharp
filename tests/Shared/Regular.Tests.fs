@@ -182,7 +182,7 @@ module Nfa =
                     ("ABBA", Some 'b') => set [ "ABBA" ] ] }
 
     // NFA with cyclic and reflexive epsilon transitions. rejects all input
-    let cyclic: Nfa<_, int> =
+    let cyclic: Nfa<char> =
         { Current = set [ 'A' ]
           Accepting = set []
           Transitions =
