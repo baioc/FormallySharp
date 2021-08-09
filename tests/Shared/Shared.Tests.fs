@@ -21,14 +21,5 @@ module Shared =
         Nfa.tests
 
         // shared business logic
-        testList "Domain Modeling" [
-            testCase "Empty string is not a valid description" <| fun _ ->
-                let expected = false
-                let actual = Todo.isValid ""
-                Expect.equal actual expected "Should be false"
-        ]
+        testList "Domain Modeling" []
     ]
-
-
-// TODO: this is only here to avoid changing names in client tests
-let shared = Shared.tests
