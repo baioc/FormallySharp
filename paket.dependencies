@@ -4,6 +4,7 @@ storage: none
 
 nuget Elmish.SweetAlert
 nuget Fable.Remoting.Giraffe
+nuget LiteDB.FSharp
 nuget Saturn
 nuget Expecto
 

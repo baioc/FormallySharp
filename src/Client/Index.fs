@@ -37,22 +37,15 @@ let api =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<FormallySharp>
 
-// TODO
 let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
-          Lexer =
-            Map.ofSeq [ "ALPHA", TokenClass (UserRegexp("ab|xx", Regexp.ofSeq "ab" + Regexp.ofSeq "xx"), 0)
-                        "ID", TokenClass (UserRegexp("xx", Regexp.ofSeq "xx"), 2)
-                        "NUM", TokenClass (UserRegexp("123", Regexp.ofSeq "123"), -1)
-                        "WS", Separator (UserRegexp " ") ] }
+          Lexer = Map.empty }
 
     let model =
         { Project = emptyProject
           Lexer = None
-          SymbolTable = [| Ok { Token = "ID"; Lexeme = "xx"; Position = 0u }
-                           Result.Error { String = "xxx"; Position = 666u }
-                           Ok { Token = "NUM"; Lexeme = "123"; Position = 16u } |]
+          SymbolTable = []
           RegularDefinitionText = "token", "", ""
           InputText = "" }
 
@@ -72,7 +65,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GenerateLexer spec ->
         let toastAlert =
-            ToastAlert("gerando lexer...")
+            ToastAlert("gerando analisador léxico...")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
@@ -85,7 +78,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GeneratedLexer lexer ->
         let toastAlert =
-            ToastAlert("lexer gerado com sucesso!")
+            ToastAlert("analisador léxico gerado")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
                 .Timeout(3000)

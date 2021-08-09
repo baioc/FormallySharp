@@ -17,3 +17,4 @@ release.sh
 *.DotSettings.user
 .vscode
 *.log
+*.db
