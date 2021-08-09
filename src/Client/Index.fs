@@ -1,172 +1,72 @@
 module Index
 
-open System.Text.RegularExpressions
 open Elmish
+open Fable.Remoting.Client
 open Elmish.SweetAlert
 open Feliz
 open Feliz.Bulma
 
-open Formally.Regular
+open Shared
 
 Fable.Core.JsInterop.importAll "./style.css"
 
 
-module Regexp =
-    let tryParse s =
-        match s with
-        | "" -> None
-        | s -> Some <| Regexp.ofSeq s // TODO
-
-/// Regexp with a user-facing string representation.
-type UserRegexp =
-    struct
-        val Regexp: Regexp
-        val private Text: string
-
-        new(text) =
-            UserRegexp(text, Regexp.tryParse text |> Option.get)
-
-        new(text, regexp) =
-            { Text = text; Regexp = regexp }
-
-        override this.ToString() =
-            let text = this.Text
-            let text = Regex.Replace(text, "\n", "\\n")
-            let text = Regex.Replace(text, "\t", "\\t")
-            $"/{text}/"
-    end
-
-type LexerPart =
-    | Token of UserRegexp
-    | Fragment of UserRegexp
-
-type LexerSpec =
-    { RegularDefinitions: Map<string, LexerPart>
-      Delimiters: Set<UserRegexp> }
-
-type Project = { Id: string; Lexer: LexerSpec }
-
-module Project =
-    let isValidId id = Regex.IsMatch(id, "\w+")
-
-type TokenInstance =
-    { Token: string
-      Lexeme: string
-      Position: uint }
-
-type Lexer = obj // TODO
-
-module Lexer =
-    let tokenize (lexer: Lexer) (input: char seq) : TokenInstance seq =
-        null // TODO
-
-
 type Model =
     { Project: Project
-      RegularDefinition: string * string * string // kind, name, regexp
-      InputText: string
+      RegularDefinitionText: string * string * string // kind, name, regexp
+      Lexer: Lexer option
       SymbolTable: TokenInstance seq
-      Lexer: Lexer option }
+      InputText: string }
 
 type Msg =
-    | SetRegularDefinition of string * string * string
-    | AddRegularDefinition of string * LexerPart
-    | RemoveRegularDefinition of string
-    | AddDelimiter of UserRegexp
-    | RemoveDelimiter of UserRegexp
-    | SetInputText of string
-    | GenerateLexer of LexerSpec
+    | SetRegularDefinitionText of string * string * string
+    | ChangeRegularDefinitions of LexicalSpecification
+    | GenerateLexer of LexicalSpecification
     | GeneratedLexer of Lexer
-    | SetProjectId of string
+    | SetInputText of string
+    | SetProjectIdText of string
     | SaveProject of Project
-    | LoadProject of string
+    | SavedProject of Identifier
+    | LoadProject of Identifier
     | LoadedProject of Project
+
+let api =
+    Remoting.createApi ()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<FormallySharp>
 
 // TODO
 let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
           Lexer =
-              { RegularDefinitions = Map.ofSeq [ ("ALPHA", Fragment (UserRegexp "[a-zA-Z_]")); ("ID", Token (UserRegexp "x") ); ]
-                Delimiters = set [ UserRegexp " \n\t" ] } }
+              Map.ofSeq [ "ALPHA", Fragment(UserRegexp "[a-zA-Z_]")
+                          "ID", Token(UserRegexp "x", 0)
+                          "WS", Separator(UserRegexp " \n\t") ] }
 
     let model =
         { Project = emptyProject
-          InputText = ""
-          RegularDefinition = "token", "", ""
-          SymbolTable = [ { Token = "ID"; Lexeme = "x"; Position = 0u }; { Token = "LET"; Lexeme = "let"; Position = 16u } ]
-          Lexer = None }
+          Lexer = None
+          SymbolTable = [| { Token = "ID"; Lexeme = "x"; Position = 0u }
+                           { Token = "LET"; Lexeme = "let"; Position = 16u } |]
+          RegularDefinitionText = "token", "", ""
+          InputText = "" }
 
     model, Cmd.none
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | SetRegularDefinition (kind, name, body) ->
+    | SetRegularDefinitionText (kind, name, body) ->
         { model with
-              RegularDefinition = kind, name, body },
+              RegularDefinitionText = kind, name, body },
         Cmd.none
 
-    | AddRegularDefinition (id, def) ->
-        let project = model.Project
-        let lexer = project.Lexer
-        let regularDefinitions = lexer.RegularDefinitions
-
+    | ChangeRegularDefinitions lexer ->
         { model with
-              Project =
-                  { project with
-                        Lexer =
-                            { lexer with
-                                  RegularDefinitions = Map.add id def regularDefinitions } } },
+              Project = { model.Project with Lexer = lexer } },
         Cmd.none
 
-    | RemoveRegularDefinition id ->
-        let project = model.Project
-        let lexer = project.Lexer
-        let regularDefinitions = lexer.RegularDefinitions
-
-        { model with
-              Project =
-                  { project with
-                        Lexer =
-                            { lexer with
-                                  RegularDefinitions = Map.remove id regularDefinitions } } },
-        Cmd.none
-
-    | AddDelimiter regexp ->
-        let project = model.Project
-        let lexer = project.Lexer
-        let delimiters = lexer.Delimiters
-
-        { model with
-              Project =
-                  { project with
-                        Lexer =
-                            { lexer with
-                                  Delimiters = Set.add regexp delimiters } } },
-        Cmd.none
-
-    | RemoveDelimiter regexp ->
-        let project = model.Project
-        let lexer = project.Lexer
-        let delimiters = lexer.Delimiters
-
-        { model with
-              Project =
-                  { project with
-                        Lexer =
-                            { lexer with
-                                  Delimiters = Set.remove regexp delimiters } } },
-        Cmd.none
-
-    | SetInputText text ->
-        { model with
-              InputText = text
-              SymbolTable =
-                if Option.isNone model.Lexer then model.SymbolTable
-                else Lexer.tokenize model.Lexer text },
-        Cmd.none
-
-    | GenerateLexer spec -> // TODO
+    | GenerateLexer spec ->
         let toastAlert =
             ToastAlert("gerando lexer...")
                 .Position(AlertPosition.Center)
@@ -174,7 +74,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .Type(AlertType.Info)
 
         model,
-        SweetAlert.Run(toastAlert)
+        Cmd.batch [
+            Cmd.OfAsync.perform api.generateLexer spec GeneratedLexer
+            SweetAlert.Run(toastAlert)
+        ]
 
     | GeneratedLexer lexer ->
         let toastAlert =
@@ -187,14 +90,36 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with Lexer = Some lexer },
         SweetAlert.Run(toastAlert)
 
-    | SetProjectId id ->
+    | SetInputText text ->
+        { model with
+              InputText = text
+              SymbolTable =
+                  match model.Lexer with
+                  | None -> model.SymbolTable
+                  | Some lexer -> Lexer.tokenize lexer text },
+        Cmd.none
+
+    | SetProjectIdText id ->
         { model with
               Project = { model.Project with Id = id } },
         Cmd.none
 
-    | SaveProject project -> // TODO
+    | SaveProject project ->
         let toastAlert =
-            ToastAlert($"projeto para \"{project.Id}\" foi salvo")
+            ToastAlert(sprintf "salvando projeto para \"%s\"..." project.Id)
+                .Position(AlertPosition.TopEnd)
+                .ConfirmButton(false)
+                .Type(AlertType.Info)
+
+        model,
+        Cmd.batch [
+            Cmd.OfAsync.perform api.saveProject project (fun _ -> SavedProject project.Id)
+            SweetAlert.Run(toastAlert)
+        ]
+
+    | SavedProject id ->
+        let toastAlert =
+            ToastAlert(sprintf "projeto para \"%s\" foi salvo" id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Timeout(3000)
@@ -203,19 +128,22 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model,
         SweetAlert.Run(toastAlert)
 
-    | LoadProject id -> // TODO
+    | LoadProject id ->
         let toastAlert =
-            ToastAlert($"carregando projeto para \"{id}\"...")
+            ToastAlert(sprintf "carregando projeto para \"%s\"..." id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
 
         model,
-        SweetAlert.Run(toastAlert)
+        Cmd.batch [
+            Cmd.OfAsync.perform api.loadProject id LoadedProject
+            SweetAlert.Run(toastAlert)
+        ]
 
     | LoadedProject project ->
         let toastAlert =
-            ToastAlert($"projeto para \"{project.Id}\" foi carregado")
+            ToastAlert(sprintf "projeto para \"%s\" foi carregado" project.Id)
                 .Position(AlertPosition.Top)
                 .ConfirmButton(true)
                 .Timeout(5000)
@@ -225,56 +153,102 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         SweetAlert.Run(toastAlert)
 
 
-let project (model: Model) (dispatch: Msg -> unit) =
-    let token = "token"
-    let fragment = "fragmento"
-    let delimiter = "separador"
+let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> unit) =
+    // kinds of regular definitions
+    let tokenOption = "token"
+    let fragmentOption = "fragmento"
+    let separatorOption = "separador"
 
-    let kind, name, body = model.RegularDefinition
     let regexp = Regexp.tryParse body
-    let isDelimiter = kind = delimiter
-
-    let nameIsValid = isDelimiter || Project.isValidId name
+    let nameIsValid = Identifier.isValid name
     let regexpIsValid = Option.isSome regexp
 
-    let buttonEnabled = nameIsValid && regexpIsValid
-    let willOverwrite =
-        (not isDelimiter) && Map.containsKey name model.Project.Lexer.RegularDefinitions
+    // normalized priority of each regular definition
+    let priorities =
+        Map.toSeq spec
+        |> Seq.map
+            (fun (name, def) ->
+                match def with
+                | Fragment _ -> -2, (name, def)
+                | Separator _ -> -1, (name, def)
+                | Token (_, p) -> p, (name, def)) // always >= 0
+        |> Seq.sortBy fst
+        |> Seq.mapi (fun newPrio (_, (name, def)) -> name, (def, newPrio))
+        |> Map.ofSeq
 
-    let addButton =
+    let maxPriority = Map.count priorities
+
+    // build a new set of orderd regular definitions while moving (or inserting) a token
+    let moveToken name regexp delta =
+        let priority =
+            Map.tryFind name priorities
+            |> Option.map snd
+            |> Option.defaultValue 0
+        let priority = priority + delta
+        let lower, higher =
+            // remove the token we're going to move
+            Map.toSeq priorities
+            |> Seq.filter (fun (other, (_, _)) -> other <> name)
+            // then partition regular definitions based on priority
+            |> Seq.sortBy (fun (_, (_, p)) -> p)
+            |> Seq.toArray
+            |> Array.partition
+                (fun (_, (_, p)) -> if delta > 0 then p <= priority else p < priority)
+        // add up the arrays, with the moved token in the middle
+        Array.concat [ lower; [| name, (Token(regexp, priority), priority) |]; higher ]
+        // re-evaluate priorities based on their resulting index
+        |> Seq.mapi
+            (fun priority (name, (def, _)) ->
+                match def with
+                | Token (regexp, _) -> name, Token(regexp, priority)
+                | def -> name, def)
+        |> Map.ofSeq
+
+    let addRegularDefinitionButton =
+        let buttonEnabled = nameIsValid && regexpIsValid
+        let willOverwrite = Map.containsKey name spec
         Bulma.button.a [
-            prop.text (if not willOverwrite then "adicionar" else $"editar <{name}>")
+            prop.text (if not willOverwrite then "adicionar" else sprintf "editar <%s>" name)
             prop.disabled (not buttonEnabled)
             prop.onClick
                 (fun _ ->
-                    if kind = delimiter then
-                        UserRegexp(body, Option.get regexp)
-                        |> AddDelimiter
+                    let regexp = UserRegexp(body, Option.get regexp)
+                    // when editing a token, we want to maintain existing priority
+                    if kind = tokenOption then
+                        match Map.tryFind name spec with
+                        | Some (Token (_, priority)) ->
+                            let token = Token(regexp, priority)
+                            Map.add name token spec
+                        | _ -> moveToken name regexp 0
+                        |> ChangeRegularDefinitions
                         |> dispatch
-                    elif kind = token then
-                        (name, Token <| UserRegexp(body, Option.get regexp))
-                        |> AddRegularDefinition
+                    // otherwise, just put the definition in the lex spec
+                    elif kind = fragmentOption then
+                        Fragment regexp
+                        |> fun def -> Map.add name def spec
+                        |> ChangeRegularDefinitions
                         |> dispatch
-                    elif kind = fragment then
-                        (name, Fragment <| UserRegexp(body, Option.get regexp))
-                        |> AddRegularDefinition
+                    elif kind = separatorOption then
+                        Separator regexp
+                        |> fun def -> Map.add name def spec
+                        |> ChangeRegularDefinitions
                         |> dispatch)
             if willOverwrite then color.isWarning else color.isSuccess
         ]
 
-    let viewRegularDefinition name regDef =
-        let name = Option.defaultValue "" name
+    let viewRegularDefinition name def =
         let kind, (regexp: UserRegexp) =
-            match regDef with
-            | Choice1Of2 (Token regexp) -> token, regexp
-            | Choice1Of2 (Fragment regexp) -> fragment, regexp
-            | Choice2Of2 delimiterRegexp -> delimiter, delimiterRegexp
+            match def with
+            | Token (regexp, _) -> tokenOption, regexp
+            | Fragment regexp -> fragmentOption, regexp
+            | Separator regexp -> separatorOption, regexp
 
         Bulma.columns [
             columns.isVCentered
             columns.isMobile
             columns.isMultiline
             prop.children [
+                // type
                 Bulma.column [
                     column.isOneFifthTablet
                     prop.children [
@@ -285,16 +259,18 @@ let project (model: Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                 ]
+                // name
                 Bulma.column [
                     column.isOneFifthTablet
                     prop.children [
                         Bulma.text.p [
-                            prop.text name
+                            prop.text (name: string)
                             text.isFamilyCode
                             color.hasTextInfo
                         ]
                     ]
                 ]
+                // user-facing regex string
                 Bulma.column [
                     column.isThreeFifthsMobile
                     prop.children [
@@ -304,34 +280,77 @@ let project (model: Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                 ]
+                // priority buttons, for tokens only
+                match def with
+                | Token (regexp, _) ->
+                    Bulma.column [
+                        column.isNarrow
+                        prop.children [
+                            Bulma.container [
+                                Bulma.icon [
+                                    icon.isSmall
+                                    prop.children [
+                                        Html.a [
+                                            prop.className "fas fa-angle-up"
+                                            prop.onClick
+                                                (fun _ ->
+                                                    moveToken name regexp +1
+                                                    |> ChangeRegularDefinitions
+                                                    |> dispatch)
+                                        ]
+                                    ]
+                                ]
+                                Bulma.icon [
+                                    icon.isSmall
+                                    prop.children [
+                                        Html.a [
+                                            prop.className "fas fa-angle-down"
+                                            prop.onClick
+                                                (fun _ ->
+                                                    moveToken name regexp -1
+                                                    |> ChangeRegularDefinitions
+                                                    |> dispatch)
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                | _ -> ()
+                // remove button
                 Bulma.column [
                     column.isNarrow
                     prop.children [
                         Bulma.delete [
                             prop.onClick
                                 (fun _ ->
-                                    match regDef with
-                                    | Choice1Of2 _ ->
-                                        name
-                                        |> RemoveRegularDefinition
-                                        |> dispatch
-                                    | Choice2Of2 sep ->
-                                        sep
-                                        |> RemoveDelimiter
-                                        |> dispatch)
+                                    Map.remove name spec
+                                    |> ChangeRegularDefinitions
+                                    |> dispatch)
                         ]
                     ]
                 ]
             ]
         ]
 
+    // when displaying, we want fragments, separators, then tokens by descending priority
+    let displayOrder =
+        Map.toSeq priorities
+        |> Seq.sortBy
+            (fun (_, (def, prio)) ->
+                match def with
+                | Fragment _ -> -2
+                | Separator _ -> -1
+                | Token _ -> maxPriority - prio)
+        |> Seq.map (fun (name, (def, _)) -> name, def)
+
     Bulma.block [
+        // existing regular definitions
         Bulma.content [
-            for regDef in model.Project.Lexer.RegularDefinitions do
-                viewRegularDefinition (Some regDef.Key) (Choice1Of2 regDef.Value)
-            for regexp in model.Project.Lexer.Delimiters do
-                viewRegularDefinition None (Choice2Of2 regexp)
+            for name, def in displayOrder do
+                viewRegularDefinition name def
         ]
+        // partially-filled regular definition fields
         Bulma.columns [
             columns.isMobile
             columns.isMultiline
@@ -341,15 +360,15 @@ let project (model: Model) (dispatch: Msg -> unit) =
                     prop.children [
                         Bulma.select [
                             prop.children [
-                                Html.option token
-                                Html.option fragment
-                                Html.option delimiter
+                                Html.option tokenOption
+                                Html.option fragmentOption
+                                Html.option separatorOption
                             ]
                             prop.value kind
                             prop.onChange
                                 (fun kind ->
                                     (kind, name, body)
-                                    |> SetRegularDefinition
+                                    |> SetRegularDefinitionText
                                     |> dispatch)
                         ]
                     ]
@@ -360,11 +379,10 @@ let project (model: Model) (dispatch: Msg -> unit) =
                         Bulma.input.text [
                             prop.value name
                             prop.placeholder "nome"
-                            prop.disabled isDelimiter
                             prop.onChange
-                                (fun (name: string) ->
-                                    (kind, name.ToUpperInvariant(), body)
-                                    |> SetRegularDefinition
+                                (fun name ->
+                                    (kind, name, body)
+                                    |> SetRegularDefinitionText
                                     |> dispatch)
                             if not nameIsValid then color.isDanger
                         ]
@@ -378,7 +396,7 @@ let project (model: Model) (dispatch: Msg -> unit) =
                             prop.onChange
                                 (fun body ->
                                     (kind, name, body)
-                                    |> SetRegularDefinition
+                                    |> SetRegularDefinitionText
                                     |> dispatch)
                             if not regexpIsValid then color.isDanger
                         ]
@@ -386,42 +404,36 @@ let project (model: Model) (dispatch: Msg -> unit) =
                 ]
                 Bulma.column [
                     column.isNarrow
-                    prop.children [ addButton ]
+                    prop.children [addRegularDefinitionButton]
                 ]
             ]
         ]
-
-        let hasToken =
-            Map.exists
-                (fun name part ->
-                    match part with
-                    | Token _ -> true
-                    | _ -> false)
-                model.Project.Lexer.RegularDefinitions
+        // lexer generation button
         Bulma.level [
             Bulma.levelItem [
                 Bulma.button.button [
-                    prop.text (if hasToken then "Gerar Lexer" else "Defina ao menos um token")
-                    prop.disabled (not hasToken)
-                    prop.onClick (fun _ -> GenerateLexer model.Project.Lexer |> dispatch )
+                    prop.text "Gerar Analisador Léxico"
+                    prop.disabled (Map.isEmpty spec)
+                    prop.onClick (fun _ -> GenerateLexer spec |> dispatch)
                     button.isLarge
-                    if hasToken then color.isPrimary else color.isWarning
+                    if Map.isEmpty spec then color.isWarning else color.isPrimary
                 ]
             ]
         ]
     ]
 
-let simulation (model: Model) (dispatch: Msg -> unit) =
-    let hasLexer = Option.isSome model.Lexer
+let recognition (lexer: Lexer option) (symbolTable: TokenInstance seq) (dispatch: Msg -> unit) =
     Bulma.columns [
+        // input
         Bulma.column [
             Bulma.textarea [
                 prop.onChange (SetInputText >> dispatch)
-                prop.disabled (not hasLexer)
-                prop.placeholder  (if hasLexer then "Forneça uma entrada ao lexer."
-                                   else "O lexer ainda não foi gerado." )
+                prop.disabled (Option.isNone lexer)
+                prop.placeholder (if Option.isSome lexer then "Forneça uma entrada ao lexer."
+                                  else "O lexer ainda não foi gerado.")
             ]
         ]
+        // symbol table
         Bulma.column [
             Bulma.table [
                 table.isFullWidth
@@ -445,7 +457,7 @@ let simulation (model: Model) (dispatch: Msg -> unit) =
                         ]
                     ]
                     Html.tbody [
-                        for entry in model.SymbolTable do
+                        for entry in symbolTable do
                             Html.tr [
                                 Html.td [
                                     prop.text entry.Token
@@ -476,18 +488,19 @@ let main (model: Model) (dispatch: Msg -> unit) =
     let projectInterface =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
-            Bulma.cardContent [ project model dispatch ]
+            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText dispatch ]
         ]
 
-    let decisionInterface =
+    let recognitionInterface =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Reconhecimento" ]
-            Bulma.cardContent [ simulation model dispatch ]
+            Bulma.cardContent [ recognition model.Lexer model.SymbolTable dispatch ]
         ]
 
     Bulma.tile [
         tile.isAncestor
         prop.children [
+            // project interface
             Bulma.tile [
                 tile.isParent
                 prop.children [
@@ -497,25 +510,28 @@ let main (model: Model) (dispatch: Msg -> unit) =
                     ]
                 ]
             ]
+            // exection interface
             Bulma.tile [
                 tile.isParent
                 prop.children [
+                    // recognition test
                     Bulma.tile [
                         tile.isChild
-                        prop.children [ decisionInterface ]
+                        prop.children [ recognitionInterface ]
                     ]
                 ]
             ]
         ]
     ]
 
-let toolbar (model: Model) (dispatch: Msg -> unit) =
-    let idInvalid = not (Project.isValidId model.Project.Id)
+let toolbar (project: Project) (dispatch: Msg -> unit) =
+    let idInvalid = not (Identifier.isValid project.Id)
 
     Bulma.level [
         prop.children [
             Bulma.levelLeft [
                 Bulma.levelItem [
+                    // project mode selector
                     Bulma.tabs [
                         tabs.isBoxed
                         prop.children [
@@ -538,6 +554,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
             ]
             Bulma.levelRight [
                 Bulma.levelItem [
+                    // project save/load interface
                     Bulma.columns [
                         columns.isVCentered
                         columns.isMobile
@@ -555,8 +572,8 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                             Bulma.column [
                                 prop.children [
                                     Bulma.input.text [
-                                        prop.value model.Project.Id
-                                        prop.onTextChange (SetProjectId >> dispatch)
+                                        prop.value project.Id
+                                        prop.onTextChange (SetProjectIdText >> dispatch)
                                         prop.placeholder "identificador"
                                     ]
                                 ]
@@ -567,8 +584,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                     Bulma.button.button [
                                         prop.text "abrir"
                                         prop.disabled idInvalid
-                                        prop.onClick
-                                            (fun _ -> LoadProject model.Project.Id |> dispatch)
+                                        prop.onClick (fun _ -> LoadProject project.Id |> dispatch)
                                         color.isDanger
                                     ]
                                 ]
@@ -579,8 +595,7 @@ let toolbar (model: Model) (dispatch: Msg -> unit) =
                                     Bulma.button.button [
                                         prop.text "salvar"
                                         prop.disabled idInvalid
-                                        prop.onClick
-                                            (fun _ -> SaveProject model.Project |> dispatch)
+                                        prop.onClick (fun _ -> SaveProject project |> dispatch)
                                         color.isDanger
                                     ]
                                 ]
@@ -643,7 +658,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         style.paddingTop (length.rem 1.0)
                         style.paddingBottom (length.rem 1.0)
                     ]
-                    prop.children [ toolbar model dispatch ]
+                    prop.children [ toolbar model.Project dispatch ]
                 ]
                 Bulma.section [
                     prop.style [
