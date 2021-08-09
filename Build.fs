@@ -2,6 +2,7 @@ open Fake.Core
 open Fake.IO
 open Farmer
 open Farmer.Builders
+open Farmer.WebApp
 
 open Helpers
 
@@ -36,13 +37,21 @@ Target.create "Bundle" (fun _ ->
 )
 
 Target.create "Azure" (fun _ ->
+    let plan = servicePlan {
+        name "FormallySharp-farm"
+        sku Sku.D1
+    }
+
     let web = webApp {
         name "FormallySharp"
         zip_deploy "deploy"
+        link_to_service_plan plan
     }
+
     let deployment = arm {
-        location Location.WestEurope
+        add_resource plan
         add_resource web
+        location Location.BrazilSouth
     }
 
     deployment
