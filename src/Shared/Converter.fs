@@ -12,21 +12,21 @@ module Converter =
         let mutable finish = 0
         let mutable parenthesesDetected = false
         for i = 0 to (expressions.Count - 1) do
-            if (expressions.[i] <> Regexp.ofChar('(') && expressions.[i] <> Regexp.ofChar(')') && expressions.[i] <> Regexp.ofChar('*') && expressions.[i] <> Regexp.ofChar('|') && not(parenthesesDetected)) then
+            if (expressions.[i] <> Regexp.singleton('(') && expressions.[i] <> Regexp.singleton(')') && expressions.[i] <> Regexp.singleton('*') && expressions.[i] <> Regexp.singleton('|') && not(parenthesesDetected)) then
                 if (value = Regexp.empty) then
                     value <- expressions.[i]
                 else 
                     value <- value * expressions.[i]
-            elif (expressions.[i]=(Regexp.ofChar('('))) then
+            elif (expressions.[i]=(Regexp.singleton('('))) then
                 parenthesesDetected <- true
                 start <- i
-            elif (expressions.[i]=(Regexp.ofChar(')'))) then
+            elif (expressions.[i]=(Regexp.singleton(')'))) then
                 finish <- i
                 let inside = expressions.GetRange(start,(finish - start + 1)) // inside = "(aba|c)"
                 let mutable pipeDetected = false
                 let mutable insideRegex = Regexp.empty
                 for j = 0 to (inside.Count - 1) do
-                    if (inside.[j]=(Regexp.ofChar('|'))) then
+                    if (inside.[j]=(Regexp.singleton('|'))) then
                         pipeDetected <- true
                         let leftList = inside.GetRange(1, j-1)
                         let mutable left = Regexp.empty
@@ -45,12 +45,12 @@ module Converter =
                         insideRegex <- left + right
                 if (not(pipeDetected)) then
                     for item in inside do
-                        if (insideRegex=(Regexp.empty) && item <> Regexp.ofChar('(') && item <> Regexp.ofChar(')')) then
+                        if (insideRegex=(Regexp.empty) && item <> Regexp.singleton('(') && item <> Regexp.singleton(')')) then
                             insideRegex <- item
-                        elif (item <> Regexp.ofChar('(') && item <> Regexp.ofChar(')')) then
+                        elif (item <> Regexp.singleton('(') && item <> Regexp.singleton(')')) then
                             insideRegex <- insideRegex * item
                 pipeDetected <- false
-                if (isKleeneClosure && expressions.[i+1]=(Regexp.ofChar('*'))) then
+                if (isKleeneClosure && expressions.[i+1]=(Regexp.singleton('*'))) then
                     if (value = Regexp.empty) then
                         value <- (!* insideRegex)
                     else
@@ -70,13 +70,12 @@ module Converter =
         let mutable start = 0
         let mutable finish = 0
         let mutable setDetected = false
-        let mutable bracketDetected = false
         let text = List.ofArray(regularDefinition.Split(':'))
         key <- text.Head // key = "L"
         let regularExpression = "(" + text.Item(1) + ")" // regularExpression = "a[A-Za-z]b(aba|c)*c"
         for i = 0 to (regularExpression.Length - 1) do
             if (regularExpression.[i] <> '[' && regularExpression.[i] <> ']' && not(setDetected)) then
-                expressions.Add(Regexp.ofChar(regularExpression.[i]))
+                expressions.Add(Regexp.singleton(regularExpression.[i]))
             elif (regularExpression.[i]=('[')) then
                 setDetected <- true
                 start <- i
@@ -99,9 +98,9 @@ module Converter =
         let mutable positionsEndParentheses = ResizeArray<int>()
         let mutable isParentheses = true
         for i = 0 to (expressions.Count - 1) do
-            if (expressions.[i]=(Regexp.ofChar('('))) then
+            if (expressions.[i]=(Regexp.singleton('('))) then
                 positionsStartParentheses.Add(i)
-            if (expressions.[i]=(Regexp.ofChar(')'))) then
+            if (expressions.[i]=(Regexp.singleton(')'))) then
                 positionsEndParentheses.Add(i) 
         if (positionsStartParentheses.Count = 0) then
             isParentheses <- false
@@ -119,7 +118,7 @@ module Converter =
                     endFor <- positionsEndParentheses.[i]
             for i = startFor to endFor do
                 newExpressions.Add(expressions.[i])
-                if (i+1 <= expressions.Count-1 && expressions.[i+1] = Regexp.ofChar('*')) then
+                if (i+1 <= expressions.Count-1 && expressions.[i+1] = Regexp.singleton('*')) then
                     newExpressions.Add(expressions.[i+1])
                     isKleeneClosure <- true
                     positionKleeneToRemove <- i+1
@@ -135,9 +134,9 @@ module Converter =
             positionsStartParentheses <- ResizeArray<int>()
             positionsEndParentheses <- ResizeArray<int>()
             for i = 0 to (expressions.Count - 1) do
-                if (expressions.[i]=(Regexp.ofChar('('))) then
+                if (expressions.[i]=(Regexp.singleton('('))) then
                     positionsStartParentheses.Add(i)
-                if (expressions.[i]=(Regexp.ofChar(')'))) then
+                if (expressions.[i]=(Regexp.singleton(')'))) then
                     positionsEndParentheses.Add(i) 
             if (positionsStartParentheses.Count = 0) then
                 isParentheses <- false

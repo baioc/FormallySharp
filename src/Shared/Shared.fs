@@ -7,47 +7,35 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-
-// DEIXA AQUI POR ENQUANTO PLEASE:
-// open System
-// open Formally.Regular
-
-// type Input = 
-//     { RegularDefinition: string
-//       Token: string
-//       TokenKeyWord: string
-//       TokenIgnore: string
-//       Simulation: string }
-
-// module Input =
-//     let create (regularDefinition: string, token: string, tokenKeyWord: string, tokenIgnore: string, simulation: string) = 
-//         { RegularDefinition = regularDefinition
-//           Token = token
-//           TokenKeyWord = tokenKeyWord
-//           TokenIgnore = tokenIgnore
-//           Simulation = simulation }
-
-// type Output =
-//     { Token: string
-//       Lexema: string
-//       Posicao: int }
-
-// module Output =
-//     let create (token: string, lexema: string, posicao: int) =
-//         { Token = token
-//           Lexema = lexema
-//           Posicao = posicao }
-
-// type IApi =
-//     { getOutputs: unit -> Async<Output list>
-//       addOutput: Output -> Async<Output> 
-//       setInput: Input -> Async<Output list>
-//     }
-
 open System.Text.RegularExpressions
 open Formally.Automata
 open Formally.Regular
 
+type Input = 
+    { RegularDefinition: string
+      Token: string
+      TokenKeyWord: string
+      TokenIgnore: string
+      Simulation: string }
+
+module Input =
+    let create (regularDefinition: string, token: string, tokenKeyWord: string, tokenIgnore: string, simulation: string) = 
+        { RegularDefinition = regularDefinition
+          Token = token
+          TokenKeyWord = tokenKeyWord
+          TokenIgnore = tokenIgnore
+          Simulation = simulation }
+
+type Output =
+    { Token: string
+      Lexema: string
+      Posicao: int }
+
+module Output =
+    let create (token: string, lexema: string, posicao: int) =
+        { Token = token
+          Lexema = lexema
+          Posicao = posicao }
 module Regexp =
     let tryParse =
         function
@@ -327,3 +315,8 @@ type FormallySharp =
       saveProject: Project -> Async<unit>
       loadProject: Identifier -> Async<Project> }
 
+// type IApi =
+//     { getOutputs: unit -> Async<Output list>
+//       addOutput: Output -> Async<Output> 
+//       setInput: Input -> Async<Output list>
+//     }

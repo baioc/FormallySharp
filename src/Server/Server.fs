@@ -21,6 +21,8 @@ type Storage() =
 
     let mutable input = Input.create("","","","","")
 
+    let outputs = ResizeArray<_>()
+
     let mutable regularDefinitionsMap = Map.empty
 
     let mutable tokensMap = Map.empty
