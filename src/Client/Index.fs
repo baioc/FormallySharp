@@ -684,10 +684,24 @@ let view (model: Model) (dispatch: Msg -> unit) =
             prop.style [ style.padding (length.rem 1) ]
             prop.children [
                 Bulma.navbarBrand.div [
-                    Bulma.title [
-                        prop.text "Formally#"
-                        title.is1
-                        color.hasTextWhite
+                    Bulma.level [
+                        Bulma.levelLeft [
+                            Bulma.title [
+                                prop.text "Formally#"
+                                title.is1
+                                color.hasTextWhite
+                            ]
+                        ]
+                        Bulma.levelRight [
+                            prop.style [ style.paddingLeft (length.rem 2) ]
+                            prop.children [
+                                Html.a [
+                                    prop.text "Atenção! Clique aqui para ver as instruções de uso"
+                                    prop.href "https://github.com/baioc/FormallySharp/wiki/Instruções"
+                                    size.isSize4
+                                ]
+                            ]
+                        ]
                     ]
                 ]
                 Bulma.navbarMenu [
