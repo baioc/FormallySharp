@@ -498,14 +498,17 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                 ]
                                 Html.tbody [
                                     for entry in symbolTable do
-                                        let kind, string, position =
+                                        let kind, string, position, isError =
                                             match entry with
-                                            | Ok token -> token.Token, token.Lexeme, token.Position
-                                            | Result.Error error -> "ERRO LÉXICO", error.String, error.Position
+                                            | Ok token ->
+                                                token.Token, token.Lexeme, token.Position, false
+                                            | Result.Error error ->
+                                                "ERRO LÉXICO", error.String, error.Position, true
                                         Html.tr [
                                             Html.td [
                                                 prop.text kind
-                                                color.hasTextInfo
+                                                if isError then color.hasTextDanger
+                                                else color.hasTextInfo
                                             ]
                                             Html.td (String.visual string)
                                             Html.td [

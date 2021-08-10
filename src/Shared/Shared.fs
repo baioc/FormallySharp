@@ -1,16 +1,12 @@
 /// Miscellaneous stuff that is used by both Client and Server.
 namespace Shared
 
-
-// defines all API endpoints
-module Route =
-    let builder typeName methodName =
-        sprintf "/api/%s/%s" typeName methodName
-
-
+open System.Runtime.CompilerServices
 open System.Text.RegularExpressions
+
 open Formally.Automata
 open Formally.Regular
+
 
 module Regexp =
     let tryParse =
@@ -18,7 +14,10 @@ module Regexp =
         | "" -> None
         | s -> Some <| Regexp.ofSeq s // TODO
 
+
+[<Extension>]
 module String =
+    /// Returns an escaped version of given string for user visibility.
     let visual str =
         let str = Regex.Replace(str, "\n", "\\n")
         let str = Regex.Replace(str, "\t", "\\t")
@@ -26,7 +25,7 @@ module String =
         str
 
 /// Regexp with a user-facing string representation.
-[<AutoOpen>]
+[<AutoOpen>] // so that we can use the unqualified constructors
 type UserRegexp =
     { Regexp: Regexp
       String: string }
@@ -54,6 +53,7 @@ module Identifier =
 
 type LexicalSpecification = Map<Identifier, RegularDefinition>
 
+/// A formal language project.
 type Project =
     { Id: Identifier
       Lexer: LexicalSpecification }
@@ -78,6 +78,7 @@ type LexerOutput =
     | Nothing
     | Unget of char
 
+/// Wraps a DFA into a ready-to-use lexer.
 type Lexer =
     { Automaton: Dfa<Set<LexerState>>
       Initial: Set<LexerState>
@@ -128,7 +129,7 @@ type Lexer =
                           Automaton = { this.Automaton with Current = this.Automaton.Dead }
                     } :> IAutomaton<_, _, _>
 
-            // transition: not-accepting -> dead ? error and to into panic mode
+            // transition: not-accepting -> dead ? error and go into panic mode
             elif next = this.Automaton.Dead && not wasAccepting then
                 Error { String = updatedString; Position = this.Start },
                 { this with
@@ -179,8 +180,9 @@ type Lexer =
                       Automaton = { this.Automaton with Current = next }
                 } :> IAutomaton<_, _, _>
 
+/// Functions for creating and manipulating lexers.
 module Lexer =
-    /// Makes a Lexer from the given specification.
+    /// Builds a Lexer from the given specification.
     let make spec =
         let makeAutomaton name def =
             let markFinal (automaton: Dfa<_>) state =
@@ -189,7 +191,9 @@ module Lexer =
                 elif state = Set.empty then
                     "{}" // dead state can be shared
                 else
-                    Set.map string state |> String.concat "," |> sprintf "%s:{%s}" name // prefix is unique
+                    Set.map string state
+                    |> String.concat ","
+                    |> sprintf "%s:{%s}" name // prefix is unique
 
             // convert regexp to DFA in the case of tokens and separators
             match def with
@@ -202,13 +206,6 @@ module Lexer =
                 |> Dfa.toNfa
                 |> Some
 
-        // make an automaton for each token and separator definition
-        let automatons =
-            Map.toSeq spec
-            |> Seq.map (fun (name, def) -> makeAutomaton name def)
-            |> Seq.filter Option.isSome
-            |> Seq.map Option.get
-
         let undiscriminatedUnion union nfa =
             Nfa.union union nfa
             |> Nfa.map
@@ -216,6 +213,13 @@ module Lexer =
                     match state with
                     | Choice1Of2 s
                     | Choice2Of2 s -> s)
+
+        // make an automaton for each token and separator definition
+        let automatons =
+            Map.toSeq spec
+            |> Seq.map (fun (name, def) -> makeAutomaton name def)
+            |> Seq.filter Option.isSome
+            |> Seq.map Option.get
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
@@ -228,7 +232,7 @@ module Lexer =
             |> Nfa.toDfa
             // filter out dead transitions
             |> Dfa.filter (fun (q, a) q' -> q' <> set [ "{}" ])
-            // distinguish states
+            // identify lexer states
             |> Dfa.map
                 (fun set ->
                     set
@@ -236,9 +240,13 @@ module Lexer =
                     |> Seq.map
                         (fun state ->
                             match Map.tryFind state spec with
-                            | None | Some (Fragment _) -> Intermediary state
-                            | Some (TokenClass (_, priority)) -> AcceptToken (state, priority)
-                            | Some (Separator _) -> AcceptSeparator state)
+                            | None
+                            | Some (Fragment _) ->
+                                Intermediary state
+                            | Some (TokenClass (_, priority)) ->
+                                AcceptToken (state, priority)
+                            | Some (Separator _) ->
+                                AcceptSeparator state)
                     |> Set.ofSeq)
 
         { Automaton = automaton; Initial = automaton.Current
@@ -285,8 +293,18 @@ module Lexer =
                     yield! tokenize lexer (Seq.tail inputs)
         }
 
-/// Defines the API between our webapp and server backend.
+
+/// Defines the API between our web app and server backend.
+///
+/// NOTE: in order to get automatic (de)serialization to and from JSON through
+/// Fable.Remoting, every type that is transmitted needs to be *fully* public.
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
       saveProject: Project -> Async<unit>
       loadProject: Identifier -> Async<Project> }
+
+/// Defines all Fable.Remoting API endpoints through the `builder` function.
+[<RequireQualifiedAccess>]
+module Route =
+    let builder typeName methodName =
+        sprintf "/api/%s/%s" typeName methodName
