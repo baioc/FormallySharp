@@ -13,13 +13,9 @@ open Formally.Regular
 open Formally.Converter
 
 module Regexp =
-    let tryParse =
-        function
-        | "" -> None
-        | s -> 
-            Some <|
-                let token = System.String.Concat(s.Split(' '))
-                Converter.convertRegularDefinitionTextToRegexp(token)
+    let tryParse (str: string) =
+        let str = System.String.Concat(str.Split(' '))
+        Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
 module String =
     let visual str =
@@ -292,5 +288,4 @@ module Lexer =
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
       saveProject: Project -> Async<unit>
-      loadProject: Identifier -> Async<Project>
-    }
+      loadProject: Identifier -> Async<Project> }

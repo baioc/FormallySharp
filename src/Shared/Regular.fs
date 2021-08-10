@@ -58,10 +58,8 @@ type Regexp<'Symbol when 'Symbol: comparison> =
         // (r?)* = r*
         | Alternation set when Set.contains Regexp<'Symbol>.One set ->
             let set = Set.remove Regexp<'Symbol>.One set
-            if Set.count set = 1 then
-                Set.minElement set |> (!*)
-            else
-                set |> Alternation |> (!*)
+            if Set.count set = 1 then Set.minElement set |> (!*)
+            else set |> Alternation |> (!*)
         // otherwise, just star it
         | r -> KleeneClosure r
 
@@ -234,7 +232,7 @@ module Nfa =
     /// Transforms an NFA by filtering its transitions.
     let filter transitionFilter (nfa: Nfa<_>) =
         { nfa with
-            Transitions = Map.filter transitionFilter nfa.Transitions }
+              Transitions = Map.filter transitionFilter nfa.Transitions }
 
     /// Discriminated union of two NFAs through epsilon transitions.
     let union a b =
@@ -343,7 +341,7 @@ module Dfa =
     // TODO: test this, as well as the NFA filter
     let filter transitionFilter (dfa: Dfa<_>) =
         { dfa with
-            Transitions = Map.filter transitionFilter dfa.Transitions }
+              Transitions = Map.filter transitionFilter dfa.Transitions }
 
     let toNfa = Nfa.ofDfa
     let ofNfa = Nfa.toDfa
@@ -389,8 +387,10 @@ module Dfa =
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->
                 let second = Concatenation rest
-                if nullable first then Set.union (firstpos first) (firstpos second)
-                else firstpos first
+                if nullable first then
+                    Set.union (firstpos first) (firstpos second)
+                else
+                    firstpos first
             | KleeneClosure r -> firstpos r
 
         let rec lastpos =
@@ -400,8 +400,10 @@ module Dfa =
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->
                 let second = Concatenation rest
-                if nullable second then Set.union (lastpos first) (lastpos second)
-                else lastpos second
+                if nullable second then
+                    Set.union (lastpos first) (lastpos second)
+                else
+                    lastpos second
             | KleeneClosure r -> lastpos r
 
         // incrementally fills the followpos table

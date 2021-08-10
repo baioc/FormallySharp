@@ -306,7 +306,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text regexp.String
+                            prop.text (string regexp)
                             text.isFamilyCode
                         ]
                     ]
