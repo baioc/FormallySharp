@@ -18,8 +18,7 @@ type Model =
       RegularDefinitionText: string * string * string // kind, name, regexp
       Lexer: Lexer option
       SymbolTable: Result<TokenInstance, LexicalError> seq
-      InputText: string
-      RegularDefinitionsMap: Map<string,string> }
+      InputText: string }
 
 type Msg =
     | SetRegularDefinitionText of string * string * string
@@ -33,7 +32,6 @@ type Msg =
     | LoadProject of Identifier
     | LoadedProject of Project
     | GotError of exn
-    | ChangeRegularDefinitionsMap of Map<string,string>
 
 let api =
     Remoting.createApi ()
@@ -50,8 +48,7 @@ let init () : Model * Cmd<Msg> =
           Lexer = None
           SymbolTable = []
           RegularDefinitionText = "token", "", ""
-          InputText = ""
-          RegularDefinitionsMap = Map.empty }
+          InputText = "" }
 
     model, Cmd.none
 
@@ -165,19 +162,31 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         model,
         SweetAlert.Run(toastAlert)
-    | ChangeRegularDefinitionsMap map ->
-        {model with RegularDefinitionsMap = map}, Cmd.none
 
 
-let project (spec: LexicalSpecification) (kind, name, body) (regularDefinitionsMap) (dispatch: Msg -> unit) =
+let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch: Msg -> unit) =
     // kinds of regular definitions
     let tokenOption = "token"
     let fragmentOption = "fragmento"
     let separatorOption = "separador"
 
-    let mutable regexp = Regexp.tryParse body
-    if (kind = tokenOption) then
-        regexp <- Regexp.tryParse (Converter.convertTokenToRegexString(body, regularDefinitionsMap))
+    let regexp =
+        if kind = fragmentOption then
+            Regexp.tryParse body
+        else
+            // make a map of (name -> regex ragment) for inlining in other definitions
+            let fragments =
+                Map.toSeq spec
+                |> Seq.choose
+                    (fun (name, def) ->
+                        match def with
+                        | Fragment r -> Some (name, r.String)
+                        | notFragment -> None)
+                |> Map.ofSeq
+            // inline fragments (if any), then parse the regex
+            Converter.convertTokenToRegexString(body, fragments)
+            |> Regexp.tryParse
+
     let nameIsValid = Identifier.isValid name
     let regexpIsValid = Option.isSome regexp
 
@@ -237,12 +246,12 @@ let project (spec: LexicalSpecification) (kind, name, body) (regularDefinitionsM
                         | Some (TokenClass (_, priority)) ->
                             let token = TokenClass (regexp, priority)
                             Map.add name token spec
-                        | _ -> moveToken name regexp 0
+                        | _ ->
+                            moveToken name regexp 0
                         |> ChangeRegularDefinitions
                         |> dispatch
                     // otherwise, just put the definition in the lex spec
                     elif kind = fragmentOption then
-                        ChangeRegularDefinitionsMap (Map.add name body regularDefinitionsMap) |> dispatch
                         Fragment regexp
                         |> fun def -> Map.add name def spec
                         |> ChangeRegularDefinitions
@@ -297,7 +306,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (regularDefinitionsM
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text (string regexp)
+                            prop.text regexp.String
                             text.isFamilyCode
                         ]
                     ]
@@ -544,7 +553,7 @@ let main (model: Model) (dispatch: Msg -> unit) =
     let projectInterface =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
-            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText model.RegularDefinitionsMap dispatch ]
+            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText dispatch ]
         ]
 
     let recognitionInterface =
