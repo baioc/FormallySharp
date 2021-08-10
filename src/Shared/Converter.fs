@@ -1,6 +1,5 @@
 namespace Formally.Converter
 
-open Shared
 open Formally.Regular
 
 

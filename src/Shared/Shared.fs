@@ -10,37 +10,22 @@ module Route =
 open System.Text.RegularExpressions
 open Formally.Automata
 open Formally.Regular
+open Formally.Converter
 
-type Input = 
-    { RegularDefinition: string
-      Token: string
-      TokenKeyWord: string
-      TokenIgnore: string
-      Simulation: string }
-
-module Input =
-    let create (regularDefinition: string, token: string, tokenKeyWord: string, tokenIgnore: string, simulation: string) = 
-        { RegularDefinition = regularDefinition
-          Token = token
-          TokenKeyWord = tokenKeyWord
-          TokenIgnore = tokenIgnore
-          Simulation = simulation }
-
-type Output =
-    { Token: string
-      Lexema: string
-      Posicao: int }
-
-module Output =
-    let create (token: string, lexema: string, posicao: int) =
-        { Token = token
-          Lexema = lexema
-          Posicao = posicao }
 module Regexp =
     let tryParse =
         function
         | "" -> None
         | s -> Some <| Regexp.ofSeq s // TODO
+
+// let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
+// for regularDefinition in regularDefinitions do 
+//     let text = List.ofArray(regularDefinition.Split(':'))
+//     storage.PutRegularDefinition(text.Head, text.Item(1))
+// let tokens = List.ofArray(System.String.Concat(input.Token.Split(' ')).Split('\n'))
+// for token in tokens do
+//     let key, value = Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
+//     storage.PutToken(key, value)
 
 module String =
     let visual str =
@@ -313,10 +298,5 @@ module Lexer =
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
       saveProject: Project -> Async<unit>
-      loadProject: Identifier -> Async<Project> }
-
-// type IApi =
-//     { getOutputs: unit -> Async<Output list>
-//       addOutput: Output -> Async<Output> 
-//       setInput: Input -> Async<Output list>
-//     }
+      loadProject: Identifier -> Async<Project>
+    }
