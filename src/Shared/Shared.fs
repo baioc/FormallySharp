@@ -25,16 +25,13 @@ module String =
         str
 
 /// Regexp with a user-facing string representation.
-[<AutoOpen>] // so that we can use the unqualified constructors
+[<AutoOpen>] // so that we may use unqualified constructors
 type UserRegexp =
     { Regexp: Regexp
       String: string }
 
     static member UserRegexp(string, regexp) =
         { String = string; Regexp = regexp }
-
-    static member UserRegexp(string) =
-        UserRegexp(string, Regexp.tryParse string |> Option.get)
 
     override this.ToString() =
         $"/{String.visual this.String}/"
