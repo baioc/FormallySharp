@@ -191,8 +191,7 @@ type Nfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
     member this.Alphabet : Set<'Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> a)
-        |> Seq.filter Option.isSome
-        |> Seq.map Option.get
+        |> Seq.choose id
         |> Set.ofSeq
 
     interface IAutomaton<Set<'State>, option<'Symbol>, unit> with
@@ -300,8 +299,10 @@ module Nfa =
                 // add the newly reached states to:
                 let nextStates =
                     newTransitions
-                    |> Seq.map (fun (symbol, state) -> state)
-                    |> Seq.filter (fun state -> not (Set.contains state visitedStates))
+                    |> Seq.choose
+                        (fun (symbol, state) ->
+                            if Set.contains state visitedStates then None
+                            else Some state)
                     |> Set.ofSeq
                 // a) the visited set
                 let visitedStates = Set.union visitedStates nextStates
@@ -438,8 +439,11 @@ module Dfa =
             for symbol in inputSymbols do
                 let next =
                     state
-                    |> Seq.filter (fun i -> correspondenceTable.[i] = symbol)
-                    |> Seq.map (fun i -> followposTable.[i])
+                    |> Seq.choose
+                        (fun index ->
+                            if correspondenceTable.[index] = symbol
+                            then Some followposTable.[index]
+                            else None)
                     |> Set.unionMany
                 transitionTable <- Map.add (state, symbol) next transitionTable
                 if not (Set.contains next visitedStates) then
@@ -448,7 +452,8 @@ module Dfa =
         // accepting states are all which contain the terminator's index
         let accepting =
             visitedStates
-            |> Set.filter (Set.exists (fun i -> correspondenceTable.[i] = terminator))
+            |> Set.filter
+                (Set.exists (fun i -> correspondenceTable.[i] = terminator))
 
         { Dead = set []
           Transitions = transitionTable

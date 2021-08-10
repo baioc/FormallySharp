@@ -184,10 +184,12 @@ type Lexer =
 module Lexer =
     /// Builds a Lexer from the given specification.
     let make spec =
-        let makeAutomaton name def =
-            let markFinal (automaton: Dfa<_>) state =
+        let makeAutomaton name regexp =
+            let automaton = Dfa.ofRegexp regexp
+
+            let markFinal state =
                 if Set.contains state automaton.Accepting then
-                    name // guaranteed singleton since generated from a regexp
+                    name // guaranteed singleton since generated with Aho's algorithm
                 elif state = Set.empty then
                     "{}" // dead state can be shared
                 else
@@ -195,16 +197,10 @@ module Lexer =
                     |> String.concat ","
                     |> sprintf "%s:{%s}" name // prefix is unique
 
-            // convert regexp to DFA in the case of tokens and separators
-            match def with
-            | Fragment _ -> None
-            | TokenClass (r, _)
-            | Separator r ->
-                let automaton = Dfa.ofRegexp r.Regexp
-                automaton // mark final states and build NFA before union
-                |> Dfa.map (markFinal automaton)
-                |> Dfa.toNfa
-                |> Some
+            // mark final states and convert to NFA before union
+            automaton
+            |> Dfa.map markFinal
+            |> Dfa.toNfa
 
         let undiscriminatedUnion union nfa =
             Nfa.union union nfa
@@ -214,12 +210,15 @@ module Lexer =
                     | Choice1Of2 s
                     | Choice2Of2 s -> s)
 
-        // make an automaton for each token and separator definition
+        // make an automaton for each token and separator
         let automatons =
             Map.toSeq spec
-            |> Seq.map (fun (name, def) -> makeAutomaton name def)
-            |> Seq.filter Option.isSome
-            |> Seq.map Option.get
+            |> Seq.choose
+                (fun (name, def) ->
+                    match def with
+                    | TokenClass (r, _)
+                    | Separator r -> Some (makeAutomaton name r.Regexp)
+                    | Fragment _ -> None)
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
