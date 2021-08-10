@@ -16,7 +16,11 @@ module Regexp =
     let tryParse =
         function
         | "" -> None
-        | s -> Some <| Regexp.ofSeq s // TODO
+        | s -> 
+            Some <|
+                let token = System.String.Concat(s.Split(' '))
+                // Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
+                Regexp.ofSeq token // TODO
 
 // let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
 // for regularDefinition in regularDefinitions do 

@@ -6,16 +6,16 @@ open Formally.Regular
 module Converter = 
 
     let getRegexFromParenthesesString(expressions: ResizeArray<Regexp>, isKleeneClosure: bool) = 
-        let mutable value = Regexp.empty
+        let mutable regex = Regexp.empty
         let mutable start = 0
         let mutable finish = 0
         let mutable parenthesesDetected = false
         for i = 0 to (expressions.Count - 1) do
             if (expressions.[i] <> Regexp.singleton('(') && expressions.[i] <> Regexp.singleton(')') && expressions.[i] <> Regexp.singleton('*') && expressions.[i] <> Regexp.singleton('|') && not(parenthesesDetected)) then
-                if (value = Regexp.empty) then
-                    value <- expressions.[i]
+                if (regex = Regexp.empty) then
+                    regex <- expressions.[i]
                 else 
-                    value <- value * expressions.[i]
+                    regex <- regex * expressions.[i]
             elif (expressions.[i]=(Regexp.singleton('('))) then
                 parenthesesDetected <- true
                 start <- i
@@ -50,28 +50,25 @@ module Converter =
                             insideRegex <- insideRegex * item
                 pipeDetected <- false
                 if (isKleeneClosure && expressions.[i+1]=(Regexp.singleton('*'))) then
-                    if (value = Regexp.empty) then
-                        value <- (!* insideRegex)
+                    if (regex = Regexp.empty) then
+                        regex <- (!* insideRegex)
                     else
-                        value <- value * (!* insideRegex)
+                        regex <- regex * (!* insideRegex)
                 else
-                    if (value = Regexp.empty) then
-                        value <- insideRegex
+                    if (regex = Regexp.empty) then
+                        regex <- insideRegex
                     else
-                        value <- value * insideRegex
+                        regex <- regex * insideRegex
                 parenthesesDetected <- false
-        value
+        regex
 
-    let convertRegularDefinitionTextToRegexp(regularDefinition: string) = // L : a[A-Za-z]b(aba|c)*c
-        let mutable key = ""
-        let mutable value = Regexp.empty
+    let convertRegularDefinitionTextToRegexp(regularDefinition: string) =
+        let mutable regex = Regexp.empty
         let mutable expressions = ResizeArray<Regexp>()
         let mutable start = 0
         let mutable finish = 0
         let mutable setDetected = false
-        let text = List.ofArray(regularDefinition.Split(':'))
-        key <- text.Head // key = "L"
-        let regularExpression = "(" + text.Item(1) + ")" // regularExpression = "a[A-Za-z]b(aba|c)*c"
+        let regularExpression = "(" + regularDefinition + ")"
         for i = 0 to (regularExpression.Length - 1) do
             if (regularExpression.[i] <> '[' && regularExpression.[i] <> ']' && not(setDetected)) then
                 expressions.Add(Regexp.singleton(regularExpression.[i]))
@@ -140,17 +137,15 @@ module Converter =
             if (positionsStartParentheses.Count = 0) then
                 isParentheses <- false
         if (expressions.Count = 1) then
-            value <- value * expressions.[0]
-        key, value
+            regex <- regex * expressions.[0]
+        regex
 
-    let convertTokenToRegexp(tokenText: string, regularDefinitionsMap: Map<string, string>) = // id: {L} ({L} | {D})*
+    let convertTokenToRegexp(token: string, regularDefinitionsMap: Map<string, string>) =
         let mutable start = 0
         let mutable finish = 0
         let mutable keyDetected = false
 
-        let text = List.ofArray(tokenText.Split(':'))
-        let mutable regularExpression = text.Head + ":"
-        let token = text.Item(1)
+        let mutable regularExpression = ""
 
         for i = 0 to token.Length - 1 do //{L} ({L} | {D})*
             if (token.[i] <> '{' && token.[i] <> '}' && not(keyDetected)) then
@@ -164,9 +159,8 @@ module Converter =
                 let mutable tokenId = ""
                 for character in inside do
                     tokenId <- tokenId + character.ToString()
-                let regex = regularDefinitionsMap.Item(tokenId)
-                regularExpression <- regularExpression + regex
+                let regexText = regularDefinitionsMap.Item(tokenId)
+                regularExpression <- regularExpression + regexText
                 keyDetected <- false
         
-        let key, value = convertRegularDefinitionTextToRegexp(regularExpression)
-        key, value
+        convertRegularDefinitionTextToRegexp(regularExpression)
