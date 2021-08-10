@@ -34,8 +34,8 @@ type Regexp<'Symbol when 'Symbol: comparison> =
     static member (*)(r: Regexp<'Symbol>, s: Regexp<'Symbol>) =
         match r, s with
         // if any operand is zero, return zero
-        | zero, _
-        | _, zero when zero = Regexp<'Symbol>.Zero -> zero
+        | zero, regex
+        | regex, zero when zero = Regexp<'Symbol>.Zero -> zero
         // if any operand is one, return the other
         | one, regex
         | regex, one when one = Regexp<'Symbol>.One -> regex
@@ -45,7 +45,7 @@ type Regexp<'Symbol when 'Symbol: comparison> =
         | Concatenation seq, regexp -> Concatenation <| List.append seq [ regexp ]
         | regexp, Concatenation seq -> Concatenation <| regexp :: seq
         // otherwise, concatenate them
-        | r, s -> Concatenation <| [ r; s ]
+        | a, b -> Concatenation <| [ a; b ]
 
     /// Kleene star/closure operator: zero or more repetitions of a regexp.
     static member (!*)(r: Regexp<'Symbol>) =
@@ -189,8 +189,7 @@ type Nfa<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
     member this.Alphabet : Set<'Symbol> =
         Map.toSeq this.Transitions
         |> Seq.map (fun ((q, a), q') -> a)
-        |> Seq.filter Option.isSome
-        |> Seq.map Option.get
+        |> Seq.choose id
         |> Set.ofSeq
 
     interface IAutomaton<Set<'State>, option<'Symbol>, unit> with
@@ -230,7 +229,7 @@ module Nfa =
           Accepting = Set.map stateMapping nfa.Accepting }
 
     /// Transforms an NFA by filtering its transitions.
-    let filter transitionFilter (nfa: Nfa<_>) =
+    let filter transitionFilter (nfa: Nfa<_, _>) =
         { nfa with
               Transitions = Map.filter transitionFilter nfa.Transitions }
 
@@ -298,8 +297,10 @@ module Nfa =
                 // add the newly reached states to:
                 let nextStates =
                     newTransitions
-                    |> Seq.map (fun (symbol, state) -> state)
-                    |> Seq.filter (fun state -> not (Set.contains state visitedStates))
+                    |> Seq.choose
+                        (fun (symbol, state) ->
+                            if Set.contains state visitedStates then None
+                            else Some state)
                     |> Set.ofSeq
                 // a) the visited set
                 let visitedStates = Set.union visitedStates nextStates
@@ -339,7 +340,7 @@ module Dfa =
 
     /// Transforms a DFA by filtering its transitions.
     // TODO: test this, as well as the NFA filter
-    let filter transitionFilter (dfa: Dfa<_>) =
+    let filter transitionFilter (dfa: Dfa<_, _>) =
         { dfa with
               Transitions = Map.filter transitionFilter dfa.Transitions }
 
@@ -374,15 +375,15 @@ module Dfa =
 
         let rec nullable =
             function
-            | Literal _ -> false
+            | Literal c -> false
             | Alternation set -> Set.exists nullable set
             | Concatenation [] -> true
             | Concatenation (first :: rest) -> nullable first && nullable (Concatenation rest)
-            | KleeneClosure _ -> true
+            | KleeneClosure r -> true
 
         let rec firstpos =
             function
-            | Literal (_, index) -> Set.singleton index
+            | Literal (c, index) -> Set.singleton index
             | Alternation set -> Seq.map firstpos set |> Set.unionMany
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->
@@ -395,7 +396,7 @@ module Dfa =
 
         let rec lastpos =
             function
-            | Literal (_, index) -> Set.singleton index
+            | Literal (c, index) -> Set.singleton index
             | Alternation set -> Seq.map lastpos set |> Set.unionMany
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->
@@ -440,8 +441,10 @@ module Dfa =
             for symbol in inputSymbols do
                 let next =
                     state
-                    |> Seq.filter (fun i -> correspondenceTable.[i] = symbol)
-                    |> Seq.map (fun i -> followposTable.[i])
+                    |> Seq.choose
+                        (fun i ->
+                            if correspondenceTable.[i] <> symbol then None
+                            else Some followposTable.[i])
                     |> Set.unionMany
                 transitionTable <- Map.add (state, symbol) next transitionTable
                 if not (Set.contains next visitedStates) then
@@ -450,7 +453,8 @@ module Dfa =
         // accepting states are all which contain the terminator's index
         let accepting =
             visitedStates
-            |> Set.filter (Set.exists (fun i -> correspondenceTable.[i] = terminator))
+            |> Set.filter
+                (Set.exists (fun i -> correspondenceTable.[i] = terminator))
 
         { Dead = set []
           Transitions = transitionTable

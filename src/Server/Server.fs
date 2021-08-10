@@ -13,6 +13,7 @@ open Shared
 
 /// Server-side storage. Use with parsimony.
 type Storage() =
+    // creates a DB if it doesn't exist, otherwise uses what's already on disk
     let database =
         let mapper = FSharpBsonMapper()
         let connStr = "Filename=FormallySharp.db;mode=Exclusive"

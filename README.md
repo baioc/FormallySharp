@@ -1,54 +1,71 @@
-# SAFE Template
+# Formally#
 
-This template can be used to generate a full-stack web application using the [SAFE Stack](https://safe-stack.github.io/). It was created using the dotnet [SAFE Template](https://safe-stack.github.io/docs/template-overview/). If you want to learn more about the template why not start with the [quick start](https://safe-stack.github.io/docs/quickstart/) guide?
+Formally# is an online formal language designer.<br/>
+**Check it out at [www.formallysharp.codes](http://www.formallysharp.codes)**
 
-## Install pre-requisites
 
-You'll need to install the following pre-requisites in order to build and run full-stack SAFE applications
+## SAFE Stack
+
+This is a full-stack web application using the [SAFE Stack](https://safe-stack.github.io/docs/overview/).
+
+![SAFE](https://www.compositional-it.com/wp-content/uploads/2019/09/safe-1.png)
+
+Other than the prototypical SAFE components (**S**aturn running on an **A**zure server and **F**able **E**lmish to compile a SPA client), we also depend on:
+* [Fable.Remoting](https://zaid-ajaj.github.io/Fable.Remoting/) for our RPC communication layer
+* [Feliz](https://zaid-ajaj.github.io/Feliz/) for client-side rendering, styled with [Feliz.Bulma](https://dzoukr.github.io/Feliz.Bulma/#/api-description)
+
+
+## Dev Setup
+
+### Install pre-requisites
+
+You'll need to install the following pre-requisites in order to build, test and run the application in your local system:
 
 * [.NET Core SDK](https://www.microsoft.com/net/download) 5.0 or higher
 * [ASP.NET Core Runtime](https://dotnet.microsoft.com/apps/aspnet)
-* [Node LTS](https://nodejs.org/en/download/)
+* [Node LTS](https://nodejs.org/en/download/), including NPM
 
-## Starting the application
+Before running the project **for the first time**, you must also restore dotnet project-local tools:
 
-Before you run the project **for the first time only** you must install dotnet "local tools" with this command:
-
-```bash
-dotnet tool restore
+```sh
+$ dotnet tool restore
 ```
 
-To concurrently run the server and the client components in watch mode use the following command:
+### Commands
 
-```bash
-dotnet run
+All dev commands are implemented in a console app using [FAKE](https://fake.build/) build rules.
+
+#### Run
+
+Locally runs both server and client in watch mode (i.e. **hot-reload enabled**):
+
+```sh
+$ dotnet run
 ```
 
-Then open `http://localhost:8080` in your browser.
+Then, browse to [localhost:8080](http://localhost:8080)
 
-The build project in root directory contains a couple of different build targets. You can specify them after `--` (target name is case-insensitive).
+#### Test
 
-To run concurrently server and client tests in watch mode (you can run this command in parallel to the previous one in new terminal):
+Concurrently runs server and client tests in watch mode:
 
-```bash
-dotnet run -- Tests
+```sh
+$ dotnet run tests
 ```
 
-Client tests are available under `http://localhost:8008` in your browser and server tests are running in watch mode in console.
+Client test results can be seen at [localhost:8008](http://localhost:8008)<br/>
+Server results are printed directly to the console.
 
-Finally, there are `Bundle` and `Azure` targets that you can use to package your app and deploy to Azure, respectively:
+#### Deploy
 
-```bash
-dotnet run -- Bundle
-dotnet run -- Azure
+Builds the project in release mode, packaging it in the `deploy/` folder:
+
+```sh
+$ dotnet run bundle
 ```
 
-## SAFE Stack Documentation
+If you have Azure CLI installed in your system, this rule deploys the project to **your account**:
 
-If you want to know more about the full SAFE Stack and all of it's components (including Azure) visit the official [SAFE documentation](https://safe-stack.github.io/docs/).
-
-You will find more documentation about the used F# components at the following places:
-
-* [Saturn](https://saturnframework.org/)
-* [Fable](https://fable.io/docs/)
-* [Elmish](https://elmish.github.io/elmish/)
+```sh
+$ dotnet run azure
+```
