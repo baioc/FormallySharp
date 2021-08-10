@@ -113,7 +113,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         model,
         Cmd.batch [
             SweetAlert.Run(toastAlert)
-            Cmd.OfAsync.either api.saveProject project (fun _ -> SavedProject project.Id) GotError
+            Cmd.OfAsync.either api.saveProject project (fun () -> SavedProject project.Id) GotError
         ]
 
     | SavedProject id ->
@@ -179,9 +179,9 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
         |> Seq.map
             (fun (name, def) ->
                 match def with
-                | Fragment _ -> -2, (name, def)
-                | Separator _ -> -1, (name, def)
-                | TokenClass (_, p) -> p, (name, def)) // always >= 0
+                | Fragment r -> -2, (name, def)
+                | Separator r -> -1, (name, def)
+                | TokenClass (r, prio) -> prio, (name, def)) // always >= 0
         |> Seq.sortBy fst
         |> Seq.mapi (fun newPrio (_, (name, def)) -> name, (def, newPrio))
         |> Map.ofSeq
@@ -198,12 +198,13 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
         let lower, higher =
             // remove the token we're going to move
             Map.toSeq priorities
-            |> Seq.filter (fun (other, (_, _)) -> other <> name)
+            |> Seq.filter (fun (other, _) -> other <> name)
             // then partition regular definitions based on priority
-            |> Seq.sortBy (fun (_, (_, p)) -> p)
+            |> Seq.sortBy (fun (_, (def, p)) -> p)
             |> Seq.toArray
             |> Array.partition
-                (fun (_, (_, p)) -> if delta > 0 then p <= priority else p < priority)
+                (fun (_, (def, p)) ->
+                    if delta > 0 then p <= priority else p < priority)
         // add up the arrays, with the moved token in the middle
         Array.concat [ lower; [| name, (TokenClass (regexp, priority), priority) |]; higher ]
         // re-evaluate priorities based on their resulting index
@@ -226,10 +227,10 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     // when editing a token, we want to maintain existing priority
                     if kind = tokenOption then
                         match Map.tryFind name spec with
-                        | Some (TokenClass (_, priority)) ->
+                        | Some (TokenClass (previous, priority)) ->
                             let token = TokenClass (regexp, priority)
                             Map.add name token spec
-                        | _ -> moveToken name regexp 0
+                        | notToken -> moveToken name regexp 0
                         |> ChangeRegularDefinitions
                         |> dispatch
                     // otherwise, just put the definition in the lex spec
@@ -249,7 +250,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
     let viewRegularDefinition name def =
         let kind, (regexp: UserRegexp) =
             match def with
-            | TokenClass (regexp, _) -> tokenOption, regexp
+            | TokenClass (regexp, priority) -> tokenOption, regexp
             | Fragment regexp -> fragmentOption, regexp
             | Separator regexp -> separatorOption, regexp
 
@@ -295,7 +296,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                 ]
                 // priority buttons, for tokens only
                 match def with
-                | TokenClass (regexp, _) ->
+                | TokenClass (regexp, priority) ->
                     Bulma.column [
                         column.isNarrow
                         prop.children [
@@ -334,7 +335,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                             ]
                         ]
                     ]
-                | _ -> ()
+                | notToken -> ()
                 // remove button
                 Bulma.column [
                     column.isNarrow
@@ -356,12 +357,12 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
     let displayOrder =
         Map.toSeq priorities
         |> Seq.sortBy
-            (fun (_, (def, prio)) ->
+            (fun (name, (def, prio)) ->
                 match def with
                 | Fragment _ -> -2
                 | Separator _ -> -1
                 | TokenClass _ -> maxPriority - prio)
-        |> Seq.map (fun (name, (def, _)) -> name, def)
+        |> Seq.map (fun (name, (def, prio)) -> name, def)
 
     Bulma.block [
         // existing regular definitions

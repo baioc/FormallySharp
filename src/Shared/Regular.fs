@@ -34,8 +34,8 @@ type Regexp<'Symbol when 'Symbol: comparison> =
     static member (*)(r: Regexp<'Symbol>, s: Regexp<'Symbol>) =
         match r, s with
         // if any operand is zero, return zero
-        | zero, _
-        | _, zero when zero = Regexp<'Symbol>.Zero -> zero
+        | zero, regex
+        | regex, zero when zero = Regexp<'Symbol>.Zero -> zero
         // if any operand is one, return the other
         | one, regex
         | regex, one when one = Regexp<'Symbol>.One -> regex
@@ -45,7 +45,7 @@ type Regexp<'Symbol when 'Symbol: comparison> =
         | Concatenation seq, regexp -> Concatenation <| List.append seq [ regexp ]
         | regexp, Concatenation seq -> Concatenation <| regexp :: seq
         // otherwise, concatenate them
-        | r, s -> Concatenation <| [ r; s ]
+        | a, b -> Concatenation <| [ a; b ]
 
     /// Kleene star/closure operator: zero or more repetitions of a regexp.
     static member (!*)(r: Regexp<'Symbol>) =
@@ -231,7 +231,7 @@ module Nfa =
           Accepting = Set.map stateMapping nfa.Accepting }
 
     /// Transforms an NFA by filtering its transitions.
-    let filter transitionFilter (nfa: Nfa<_>) =
+    let filter transitionFilter (nfa: Nfa<_, _>) =
         { nfa with
             Transitions = Map.filter transitionFilter nfa.Transitions }
 
@@ -342,7 +342,7 @@ module Dfa =
 
     /// Transforms a DFA by filtering its transitions.
     // TODO: test this, as well as the NFA filter
-    let filter transitionFilter (dfa: Dfa<_>) =
+    let filter transitionFilter (dfa: Dfa<_, _>) =
         { dfa with
             Transitions = Map.filter transitionFilter dfa.Transitions }
 
@@ -377,15 +377,15 @@ module Dfa =
 
         let rec nullable =
             function
-            | Literal _ -> false
+            | Literal c -> false
             | Alternation set -> Set.exists nullable set
             | Concatenation [] -> true
             | Concatenation (first :: rest) -> nullable first && nullable (Concatenation rest)
-            | KleeneClosure _ -> true
+            | KleeneClosure r -> true
 
         let rec firstpos =
             function
-            | Literal (_, index) -> Set.singleton index
+            | Literal (c, index) -> Set.singleton index
             | Alternation set -> Seq.map firstpos set |> Set.unionMany
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->
@@ -396,7 +396,7 @@ module Dfa =
 
         let rec lastpos =
             function
-            | Literal (_, index) -> Set.singleton index
+            | Literal (c, index) -> Set.singleton index
             | Alternation set -> Seq.map lastpos set |> Set.unionMany
             | Concatenation [] -> Set.empty
             | Concatenation (first :: rest) ->

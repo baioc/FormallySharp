@@ -218,7 +218,7 @@ module Lexer =
                     match def with
                     | TokenClass (r, _)
                     | Separator r -> Some (makeAutomaton name r.Regexp)
-                    | Fragment _ -> None)
+                    | Fragment r -> None)
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
@@ -239,13 +239,9 @@ module Lexer =
                     |> Seq.map
                         (fun state ->
                             match Map.tryFind state spec with
-                            | None
-                            | Some (Fragment _) ->
-                                Intermediary state
-                            | Some (TokenClass (_, priority)) ->
-                                AcceptToken (state, priority)
-                            | Some (Separator _) ->
-                                AcceptSeparator state)
+                            | None | Some (Fragment _) -> Intermediary state
+                            | Some (TokenClass (r, priority)) -> AcceptToken (state, priority)
+                            | Some (Separator r) -> AcceptSeparator state)
                     |> Set.ofSeq)
 
         { Automaton = automaton; Initial = automaton.Current
@@ -265,13 +261,13 @@ module Lexer =
                 | Token token ->
                     yield Ok token
                     yield! tokenize lexer inputs
-                | Unget _ ->
+                | Unget c ->
                     yield! tokenize lexer inputs
 
                 // skip errors (all but the last) until we leave panic mode
                 | Error error ->
                     let mutable lastError = error
-                    let isError = function Error _ -> true | _ -> false
+                    let isError = function Error e -> true | notError -> false
                     let mutable lexer = lexer
                     let mutable inputs = Seq.tail inputs
                     let mutable output = output
@@ -283,7 +279,7 @@ module Lexer =
                             lexer <- next
                             inputs <- Seq.tail inputs
                             lastError <- error
-                        | _ -> ()
+                        | notError -> ()
                     yield Result.Error lastError
                     yield! tokenize lexer inputs
 
