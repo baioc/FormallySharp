@@ -1,8 +1,8 @@
 /// Miscellaneous stuff that is used by both Client and Server.
 namespace Shared
 
-open System.Runtime.CompilerServices
 open System.Text.RegularExpressions
+open System.Runtime.CompilerServices
 
 open Formally.Automata
 open Formally.Regular
@@ -247,8 +247,16 @@ module Lexer =
     /// Generates tokens and/or errors by an input sequence.
     let rec tokenize (lexer: IAutomaton<_, char, LexerOutput>) inputs =
         seq {
-            // start by the first input (if any)
-            if not (Seq.isEmpty inputs) then
+            // when the input stream is empty, check what state we ended up in
+            if Seq.isEmpty inputs then
+                let eof = '\u0000' // fake input, we don't care if it rejects
+                let output, _ = Automaton.step eof lexer
+                match output with
+                | Token last -> yield Ok last
+                | notToken -> ()
+
+            // otherwise, iterate down the input stream
+            else
                 let input = Seq.head inputs
                 let output, lexer = Automaton.step input lexer
 

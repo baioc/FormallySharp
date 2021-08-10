@@ -15,7 +15,7 @@ Fable.Core.JsInterop.importAll "./style.css"
 
 type Model =
     { Project: Project
-      RegularDefinitionText: string * string * string // kind, name, regexp
+      RegularDefinitionText: string * string * string // kind, name, regex
       Lexer: Lexer option
       SymbolTable: Result<TokenInstance, LexicalError> seq
       InputText: string }
@@ -188,7 +188,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
             |> Regexp.tryParse
 
     let nameIsValid = Identifier.isValid name
-    let regexpIsValid = Option.isSome regexp
+    let regexIsValid = Option.isSome regexp
 
     // normalized priority of each regular definition
     let priorities =
@@ -205,7 +205,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
 
     let maxPriority = Map.count priorities
 
-    // build a new set of orderd regular definitions while moving (or inserting) a token
+    // build a new set of ordered regular definitions while moving (or inserting) a token
     let moveToken name regexp delta =
         let priority =
             Map.tryFind name priorities
@@ -233,7 +233,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
         |> Map.ofSeq
 
     let addRegularDefinitionButton =
-        let buttonEnabled = nameIsValid && regexpIsValid
+        let buttonEnabled = nameIsValid && regexIsValid
         let willOverwrite = Map.containsKey name spec
         Bulma.button.a [
             prop.text (if not willOverwrite then "adicionar" else sprintf "editar <%s>" name)
@@ -441,7 +441,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                                     (kind, name, body)
                                     |> SetRegularDefinitionText
                                     |> dispatch)
-                            if not regexpIsValid then color.isDanger
+                            if not regexIsValid then color.isDanger
                         ]
                     ]
                 ]

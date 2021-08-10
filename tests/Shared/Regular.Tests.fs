@@ -6,8 +6,9 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Formally.Regular
 open System
+
+open Formally.Regular
 
 
 [<AutoOpen>]
