@@ -10,6 +10,7 @@ open LiteDB.FSharp.Extensions
 
 open Shared
 
+
 /// Server-side storage. Use with parsimony.
 type Storage() =
     let database =
@@ -29,17 +30,13 @@ type Storage() =
         | None -> projects.Insert(project) |> ignore
         | Some _ -> projects.Update(project) |> ignore
 
-
 let storage = Storage()
 
 
 let api =
-
     { generateLexer = fun spec -> async { return Lexer.make spec }
       saveProject = fun project -> async { return storage.SaveProject(project) }
-      loadProject = fun id -> async { return storage.GetProject(id) } 
-    }
-
+      loadProject = fun id -> async { return storage.GetProject(id) } }
 
 let webApp =
     Remoting.createApi ()
