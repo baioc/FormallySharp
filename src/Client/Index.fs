@@ -84,7 +84,9 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .Timeout(3000)
                 .Type(AlertType.Success)
 
-        { model with Lexer = Some lexer },
+        { model with
+              Lexer = Some lexer
+              SymbolTable = Lexer.tokenize lexer model.InputText },
         SweetAlert.Run(toastAlert)
 
     | SetInputText text ->
@@ -151,9 +153,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GotError ex ->
         let toastAlert =
-            ToastAlert($"erro no servidor: {ex.Message}")
+            ToastAlert("erro ao efetuar operação")
                 .Position(AlertPosition.Top)
                 .ConfirmButton(true)
+                .Timeout(13000)
                 .Type(AlertType.Error)
 
         model,

@@ -67,13 +67,15 @@ type Storage() =
         simulationArray.Add word
         Ok()
 
-    /// Retrieves a project by its identifier.
+    /// Retrieves a project by its identifier, raising an error when not found.
     member __.GetProject(id) =
         projects.findOne <@ fun project -> project.Id = id @>
 
     /// Saves a project to the database. Always overwrites.
     member __.SaveProject(project: Project) =
-        projects.Insert(project)
+        match projects.tryFindOne <@ fun p -> p.Id = project.Id @> with
+        | None -> projects.Insert(project) |> ignore
+        | Some _ -> projects.Update(project) |> ignore
 
 
 let storage = Storage()
@@ -129,10 +131,8 @@ let api =
     // }
 
     { generateLexer = fun spec -> async { return Lexer.make spec }
-      saveProject = fun project -> async { return storage.SaveProject(project) |> ignore }
-      loadProject = fun id -> async { return storage.GetProject(id) } 
-      }
-
+      saveProject = fun project -> async { return storage.SaveProject(project) }
+      loadProject = fun id -> async { return storage.GetProject(id) } }
 
 let webApp =
     Remoting.createApi ()
