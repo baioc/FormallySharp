@@ -7,16 +7,19 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
-
 open System.Text.RegularExpressions
 open Formally.Automata
 open Formally.Regular
+open Formally.Converter
 
 module Regexp =
     let tryParse =
         function
         | "" -> None
-        | s -> Some <| Regexp.ofSeq s // TODO
+        | s -> 
+            Some <|
+                let token = System.String.Concat(s.Split(' '))
+                Converter.convertRegularDefinitionTextToRegexp(token)
 
 module String =
     let visual str =
@@ -289,4 +292,5 @@ module Lexer =
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
       saveProject: Project -> Async<unit>
-      loadProject: Identifier -> Async<Project> }
+      loadProject: Identifier -> Async<Project>
+    }

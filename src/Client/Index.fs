@@ -8,6 +8,7 @@ open Feliz.Bulma
 
 open Shared
 open Formally.Regular
+open Formally.Converter
 
 Fable.Core.JsInterop.importAll "./style.css"
 
@@ -163,13 +164,29 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         SweetAlert.Run(toastAlert)
 
 
-let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> unit) =
+let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch: Msg -> unit) =
     // kinds of regular definitions
     let tokenOption = "token"
     let fragmentOption = "fragmento"
     let separatorOption = "separador"
 
-    let regexp = Regexp.tryParse body
+    let regexp =
+        if kind = fragmentOption then
+            Regexp.tryParse body
+        else
+            // make a map of (name -> regex ragment) for inlining in other definitions
+            let fragments =
+                Map.toSeq spec
+                |> Seq.choose
+                    (fun (name, def) ->
+                        match def with
+                        | Fragment r -> Some (name, r.String)
+                        | notFragment -> None)
+                |> Map.ofSeq
+            // inline fragments (if any), then parse the regex
+            Converter.convertTokenToRegexString(body, fragments)
+            |> Regexp.tryParse
+
     let nameIsValid = Identifier.isValid name
     let regexpIsValid = Option.isSome regexp
 
@@ -229,7 +246,8 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                         | Some (TokenClass (_, priority)) ->
                             let token = TokenClass (regexp, priority)
                             Map.add name token spec
-                        | _ -> moveToken name regexp 0
+                        | _ ->
+                            moveToken name regexp 0
                         |> ChangeRegularDefinitions
                         |> dispatch
                     // otherwise, just put the definition in the lex spec
@@ -288,7 +306,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text (string regexp)
+                            prop.text regexp.String
                             text.isFamilyCode
                         ]
                     ]
