@@ -19,17 +19,7 @@ module Regexp =
         | s -> 
             Some <|
                 let token = System.String.Concat(s.Split(' '))
-                // Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
-                Regexp.ofSeq token // TODO
-
-// let regularDefinitions = List.ofArray(System.String.Concat(input.RegularDefinition.Split(' ')).Split('\n'))
-// for regularDefinition in regularDefinitions do 
-//     let text = List.ofArray(regularDefinition.Split(':'))
-//     storage.PutRegularDefinition(text.Head, text.Item(1))
-// let tokens = List.ofArray(System.String.Concat(input.Token.Split(' ')).Split('\n'))
-// for token in tokens do
-//     let key, value = Converter.convertTokenToRegexp(token, storage.GetRegularDefinitionsMap())
-//     storage.PutToken(key, value)
+                Converter.convertRegularDefinitionTextToRegexp(token)
 
 module String =
     let visual str =

@@ -8,6 +8,7 @@ open Feliz.Bulma
 
 open Shared
 open Formally.Regular
+open Formally.Converter
 
 Fable.Core.JsInterop.importAll "./style.css"
 
@@ -17,7 +18,8 @@ type Model =
       RegularDefinitionText: string * string * string // kind, name, regexp
       Lexer: Lexer option
       SymbolTable: Result<TokenInstance, LexicalError> seq
-      InputText: string }
+      InputText: string
+      RegularDefinitionsMap: Map<string,string> }
 
 type Msg =
     | SetRegularDefinitionText of string * string * string
@@ -31,6 +33,7 @@ type Msg =
     | LoadProject of Identifier
     | LoadedProject of Project
     | GotError of exn
+    | ChangeRegularDefinitionsMap of Map<string,string>
 
 let api =
     Remoting.createApi ()
@@ -47,7 +50,8 @@ let init () : Model * Cmd<Msg> =
           Lexer = None
           SymbolTable = []
           RegularDefinitionText = "token", "", ""
-          InputText = "" }
+          InputText = ""
+          RegularDefinitionsMap = Map.empty }
 
     model, Cmd.none
 
@@ -161,15 +165,19 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         model,
         SweetAlert.Run(toastAlert)
+    | ChangeRegularDefinitionsMap map ->
+        {model with RegularDefinitionsMap = map}, Cmd.none
 
 
-let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> unit) =
+let project (spec: LexicalSpecification) (kind, name, body) (regularDefinitionsMap) (dispatch: Msg -> unit) =
     // kinds of regular definitions
     let tokenOption = "token"
     let fragmentOption = "fragmento"
     let separatorOption = "separador"
 
-    let regexp = Regexp.tryParse body
+    let mutable regexp = Regexp.tryParse body
+    if (kind = tokenOption) then
+        regexp <- Regexp.tryParse (Converter.convertTokenToRegexString(body, regularDefinitionsMap))
     let nameIsValid = Identifier.isValid name
     let regexpIsValid = Option.isSome regexp
 
@@ -234,6 +242,7 @@ let project (spec: LexicalSpecification) (kind, name, body) (dispatch: Msg -> un
                         |> dispatch
                     // otherwise, just put the definition in the lex spec
                     elif kind = fragmentOption then
+                        ChangeRegularDefinitionsMap (Map.add name body regularDefinitionsMap) |> dispatch
                         Fragment regexp
                         |> fun def -> Map.add name def spec
                         |> ChangeRegularDefinitions
@@ -535,7 +544,7 @@ let main (model: Model) (dispatch: Msg -> unit) =
     let projectInterface =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
-            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText dispatch ]
+            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText model.RegularDefinitionsMap dispatch ]
         ]
 
     let recognitionInterface =

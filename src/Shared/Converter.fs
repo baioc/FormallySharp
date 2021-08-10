@@ -140,7 +140,7 @@ module Converter =
             regex <- regex * expressions.[0]
         regex
 
-    let convertTokenToRegexp(token: string, regularDefinitionsMap: Map<string, string>) =
+    let convertTokenToRegexString(token: string, regularDefinitionsMap: Map<string, string>) =
         let mutable start = 0
         let mutable finish = 0
         let mutable keyDetected = false
@@ -159,8 +159,11 @@ module Converter =
                 let mutable tokenId = ""
                 for character in inside do
                     tokenId <- tokenId + character.ToString()
-                let regexText = regularDefinitionsMap.Item(tokenId)
-                regularExpression <- regularExpression + regexText
+                if (regularDefinitionsMap.ContainsKey(tokenId)) then
+                    let regexText = regularDefinitionsMap.Item(tokenId)
+                    regularExpression <- regularExpression + regexText
+                else 
+                    regularExpression <- regularExpression + tokenId
                 keyDetected <- false
         
-        convertRegularDefinitionTextToRegexp(regularExpression)
+        regularExpression
