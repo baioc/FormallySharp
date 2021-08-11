@@ -103,6 +103,8 @@ module Converter =
                 positionsEndParentheses.Add(i) 
         if (positionsStartParentheses.Count = 0) then
             isParentheses <- false
+        if (positionsStartParentheses.Count <> positionsEndParentheses.Count) then
+            isParentheses <- false
         let mutable newExpressions = ResizeArray<Regexp>()
         let mutable isKleeneClosure = false
         let mutable positionKleeneToRemove = 99999999

@@ -738,7 +738,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                     prop.text "Trabalho para a disciplina de Linguagens Formais e Compiladores (INE5421)"
                     prop.href repoUrl
                 ]
-                Html.p "© 2021 Gabriel B. Sant'Anna, Marcelo Contin, João Vitor"
+                Html.p "© 2021 Gabriel B. Sant'Anna, Marcelo P. G. Contin, João Vitor de S. Costa"
             ]
         ]
 
