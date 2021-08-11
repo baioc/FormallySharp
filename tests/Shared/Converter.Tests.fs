@@ -44,8 +44,8 @@ module Converter =
             let regexB = Regexp.singleton('a')
             Expect.equal (Converter.convertRegularDefinitionTextToRegexp(string)) (!*(regexA + regexB)) "should be equal"
 
-        testCase "([0-9]|a)*([A-Za-z]abab|[0-9]zzzz)" <| fun _ ->
-            let string = "([0-9]|a)*([A-Za-z]abab|[0-9]zzzz)"
-            let regex = (!*(Regexp.ofSet(['0' .. '9']) + Regexp.singleton('a')) * (((Regexp.ofSet(['A' .. 'Z']) + Regexp.ofSet(['a' .. 'z'])) * Regexp.ofSeq "abab") + (Regexp.ofSet(['0' .. '9']) * Regexp.ofSeq "zzzz")))
+        testCase "([0-9]|a)*(abab|[0-9])" <| fun _ ->
+            let string = "([0-9]|a)*(abab|[0-9])"
+            let regex = !*(Regexp.ofSet(['0' .. '9']) + Regexp.singleton('a')) * ( (Regexp.ofSeq "abab") + Regexp.ofSet(['0' .. '9']) )
             Expect.equal (Converter.convertRegularDefinitionTextToRegexp(string)) (regex) "should be equal"
     ]
