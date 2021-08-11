@@ -8,9 +8,9 @@ open Expecto
 
 open System
 
-open Converter
+open Formally.Converter
 
-open Regular
+open Formally.Regular
 
 module Converter =
 

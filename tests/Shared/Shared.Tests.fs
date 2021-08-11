@@ -13,11 +13,13 @@ open Shared
 module Shared =
     open Formally.Automata.Tests
     open Formally.Regular.Tests
+    open Formally.Converter.Tests
 
     let tests = testList "Shared" [
         // internal libraries
         Automaton.tests
         Regexp.tests
+        Converter.tests
         Nfa.tests
 
         // shared business logic
