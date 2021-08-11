@@ -522,7 +522,11 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                             | Ok token ->
                                                 token.Token, token.Lexeme, token.Position, false
                                             | Result.Error error ->
-                                                "ERRO LÉXICO", error.String, error.Position, true
+                                                let pseudoLexeme =
+                                                    error.String
+                                                    |> Seq.map (sprintf "%c")
+                                                    |> String.concat ""
+                                                "ERRO LÉXICO", pseudoLexeme, error.Position, true
                                         Html.tr [
                                             Html.td [
                                                 prop.text kind

@@ -1,4 +1,3 @@
-/// Miscellaneous stuff that is used by both Client and Server.
 namespace Shared
 
 open System.Text.RegularExpressions
@@ -10,8 +9,11 @@ open Formally.Converter
 
 
 module Regexp =
-    let tryParse (str: string) =
-        let str = System.String.Concat(str.Split(' '))
+    let tryParse str =
+        // unescape some literals known to be safe
+        let str = Regex.Replace(str, "\\n", "\n")
+        let str = Regex.Replace(str, "\\t", "\t")
+        // FIXME: even when input is not valid, this will still give a (weird) regexp
         Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
 
@@ -21,7 +23,7 @@ module String =
     let visual str =
         let str = Regex.Replace(str, "\n", "\\n")
         let str = Regex.Replace(str, "\t", "\\t")
-        let str = Regex.Replace(str, " ", "\u00B7")
+        let str = Regex.Replace(str, " ", "\u00B7") // unicode for visual space
         str
 
 /// Regexp with a user-facing string representation.
@@ -60,7 +62,7 @@ type LexerState =
     | AcceptSeparator of Identifier
     | Intermediary of Identifier
 
-/// Wraps a DFA into a ready-to-use lexer.
+/// Current lexer state over some input.
 type Lexer =
     { Automaton: Dfa<Set<LexerState>>
       Initial: Set<LexerState>
@@ -74,12 +76,13 @@ type TokenInstance =
       Position: uint }
 
 type LexicalError =
-    { String: string
+    { String: char seq
       Position: uint }
 
 /// Functions for creating and manipulating lexers.
+// TODO: write tests for these
 module Lexer =
-    /// Builds a Lexer from the given specification.
+    /// Builds a Lexer with a clean state according to the given specification.
     let make spec =
         let makeAutomaton name regexp =
             let automaton = Dfa.ofRegexp regexp
@@ -94,7 +97,7 @@ module Lexer =
                     |> String.concat ","
                     |> sprintf "%s:{%s}" name // prefix is unique
 
-            // mark final states and convert to NFA before union
+            // mark final states and prepare for union
             automaton
             |> Dfa.map markFinal
             |> Dfa.toNfa
@@ -115,7 +118,7 @@ module Lexer =
                     match def with
                     | TokenClass (r, _)
                     | Separator r -> Some (makeAutomaton name r.Regexp)
-                    | Fragment r -> None)
+                    | Fragment _ -> None)
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
@@ -136,22 +139,22 @@ module Lexer =
                     |> Seq.map
                         (fun state ->
                             match Map.tryFind state spec with
-                            | None | Some (Fragment _) -> Intermediary state
                             | Some (TokenClass (r, priority)) -> AcceptToken (state, priority)
-                            | Some (Separator r) -> AcceptSeparator state)
+                            | Some (Separator r) -> AcceptSeparator state
+                            | notAccepting -> Intermediary state)
                     |> Set.ofSeq)
 
         { Automaton = automaton; Initial = automaton.Current
           String = ""; Start = 0u; Position = 0u }
 
-    /// Makes a token iff the lexer is currently accepting a **non-empty token**.
+    /// Makes a token iff the lexer is currently accepting a non-empty lexeme.
     let private tryMakeToken lexer =
         if lexer.Automaton.Current = Set.empty then
             None // ^ dead state, so obviously not accepting
         elif lexer.String = "" then
-            None // a lexer should never produce an empty token
+            None // a lexer must never produce a token from an empty lexeme
         else
-            // choose the accepting state with the highest priority
+            // choose the state with the highest priority
             let acceptLabel =
                 Set.toSeq lexer.Automaton.Current
                 |> Seq.map
@@ -162,7 +165,7 @@ module Lexer =
                         | AcceptToken (_, priority) -> int64 priority, label)
                 |> Seq.maxBy fst
                 |> snd
-            // ensure we're actually accepting a token (and not a separator)
+            // ensure we're actually accepting a token
             match acceptLabel with
             | AcceptToken (token, priority) ->
                 Some { Token = token
@@ -183,7 +186,8 @@ module Lexer =
                 | Some lastToken -> yield Ok lastToken
                 | None -> ()
             else
-                yield Error { Position = lexer.Start; String = lexer.String }
+                let error = { Position = lexer.Start; String = lexer.String }
+                yield Error error // aka "unexpected end of file ..."
 
         // otherwise, apply transition logic and iterate down the input stream
         else
@@ -198,23 +202,23 @@ module Lexer =
                 | Some token -> yield Ok token
                 | None -> ()
 
-                // since the condition above avoids empty strings,
-                // we can reset the DFA and recurse with the same inputs
+                // since the condition above avoids empty strings, we can  reset the
+                // DFA and recurse with the same inputs without going infinite
                 let lexer =
                     { lexer with
                         Automaton = { lexer.Automaton with Current = lexer.Initial }
                         String = ""
-                        Start = lexer.Position
+                        Start = lexer.Position // change where the next lexeme begins
                         Position = lexer.Position }
                 yield! tokenize lexer inputs
 
-            // not accepting -> dead ? halt with an error
             elif justDied && (not wasAccepting) then
+                // make an error containing all input from this point forward
                 yield Error { Position = lexer.Start
-                              String = lexer.String + (string input) }
+                              String = inputs }
 
-            // otherwise, keep going with the updated lexer
             else
+                // otherwise, keep going with the updated lexer
                 let lexer =
                     { lexer with
                         Automaton = { lexer.Automaton with Current = nextState }
