@@ -48,4 +48,9 @@ module Converter =
             let string = "([0-9]|a)*(abab|[0-9])"
             let regex = !*(Regexp.ofSet(['0' .. '9']) + Regexp.singleton('a')) * ( (Regexp.ofSeq "abab") + Regexp.ofSet(['0' .. '9']) )
             Expect.equal (Converter.convertRegularDefinitionTextToRegexp(string)) (regex) "should be equal"
+
+        testCase "&" <| fun _ ->
+            let string = "&"
+            let regex = Regexp.empty
+            Expect.equal (Converter.convertRegularDefinitionTextToRegexp(string)) (regex) "should be equal"
     ]

@@ -71,7 +71,10 @@ module Converter =
         let regularExpression = "(" + regularDefinition + ")"
         for i = 0 to (regularExpression.Length - 1) do
             if (regularExpression.[i] <> '[' && regularExpression.[i] <> ']' && not(setDetected)) then
-                expressions.Add(Regexp.singleton(regularExpression.[i]))
+                if (regularExpression.[i] = '&') then
+                    expressions.Add(Regexp.empty)
+                else
+                    expressions.Add(Regexp.singleton(regularExpression.[i]))
             elif (regularExpression.[i]=('[')) then
                 setDetected <- true
                 start <- i
