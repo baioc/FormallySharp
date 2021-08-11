@@ -266,7 +266,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
         ]
 
     let viewRegularDefinition name def =
-        let kind, (regexp: UserRegexp) =
+        let kind, (userRegexp: UserRegexp) =
             match def with
             | TokenClass (regexp, priority) -> tokenOption, regexp
             | Fragment regexp -> fragmentOption, regexp
@@ -307,7 +307,11 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text (string regexp)
+#if DEBUG                   // during development, show Regexp tree
+                            prop.text (string userRegexp.Regexp)
+#else                       // on release, show user-facing regex
+                            prop.text (string userRegexp)
+#endif
                             text.isFamilyCode
                         ]
                     ]

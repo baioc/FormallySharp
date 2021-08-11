@@ -9,10 +9,13 @@ open Formally.Converter
 
 
 module Regexp =
-    let tryParse str =
+    let tryParse (str: string) =
         // unescape some literals known to be safe
-        let str = Regex.Replace(str, "\\n", "\n")
-        let str = Regex.Replace(str, "\\t", "\t")
+        // XXX: for some reason, this works while `Regex.Replace` doesn't
+        let str = str.Replace("\\t", "\t")
+                     .Replace("\\r\\n", "\r\n")
+                     .Replace("\\n", "\n")
+                     .Replace("\\\\", "\\")
         // FIXME: even when input is not valid, this will still give a (weird) regexp
         Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
@@ -20,11 +23,12 @@ module Regexp =
 [<Extension>]
 module String =
     /// Returns an escaped version of given string for user visibility.
-    let visual str =
-        let str = Regex.Replace(str, "\n", "\\n")
-        let str = Regex.Replace(str, "\t", "\\t")
-        let str = Regex.Replace(str, " ", "\u00B7") // unicode for visual space
-        str
+    let visual (str: string) =
+        str.Replace("\\", "\\\\")
+           .Replace("\r\n", "\\r\\n")
+           .Replace("\n", "\\n")
+           .Replace("\t", "\\t")
+           .Replace(" ", "\u00B7") // <- unicode for visual space
 
 /// Regexp with a user-facing string representation.
 [<AutoOpen>] // so that we may use unqualified constructors
@@ -206,24 +210,24 @@ module Lexer =
                 // DFA and recurse with the same inputs without going infinite
                 let lexer =
                     { lexer with
-                        Automaton = { lexer.Automaton with Current = lexer.Initial }
-                        String = ""
-                        Start = lexer.Position // change where the next lexeme begins
-                        Position = lexer.Position }
+                          Automaton = { lexer.Automaton with Current = lexer.Initial }
+                          String = ""
+                          Start = lexer.Position // change where the next lexeme begins
+                          Position = lexer.Position }
                 yield! tokenize lexer inputs
 
             elif justDied && (not wasAccepting) then
                 // make an error containing all input from this point forward
                 yield Error { Position = lexer.Start
-                              String = inputs }
+                              String = Seq.append lexer.String inputs }
 
             else
                 // otherwise, keep going with the updated lexer
                 let lexer =
                     { lexer with
-                        Automaton = { lexer.Automaton with Current = nextState }
-                        String = lexer.String + (string input)
-                        Position = lexer.Position + 1u }
+                          Automaton = { lexer.Automaton with Current = nextState }
+                          String = lexer.String + (string input)
+                          Position = lexer.Position + 1u }
                 yield! tokenize lexer (Seq.tail inputs)
     }
 
