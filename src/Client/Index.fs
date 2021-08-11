@@ -266,7 +266,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
         ]
 
     let viewRegularDefinition name def =
-        let kind, (regexp: UserRegexp) =
+        let kind, (userRegexp: UserRegexp) =
             match def with
             | TokenClass (regexp, priority) -> tokenOption, regexp
             | Fragment regexp -> fragmentOption, regexp
@@ -307,7 +307,11 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text (string regexp)
+#if DEBUG                   // during development, show Regexp tree
+                            prop.text (string userRegexp.Regexp)
+#else                       // on release, show user-facing regex
+                            prop.text (String.visual userRegexp.String)
+#endif
                             text.isFamilyCode
                         ]
                     ]
@@ -517,19 +521,26 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                 ]
                                 Html.tbody [
                                     for entry in symbolTable do
-                                        let kind, string, position, isError =
+                                        let kind, lexeme, position, isError =
                                             match entry with
                                             | Ok token ->
                                                 token.Token, token.Lexeme, token.Position, false
                                             | Result.Error error ->
-                                                "ERRO LÉXICO", error.String, error.Position, true
+                                                let pseudoLexeme =
+                                                    error.String
+                                                    |> Seq.map (sprintf "%c")
+                                                    |> String.concat ""
+                                                "ERRO LÉXICO", pseudoLexeme, error.Position, true
                                         Html.tr [
                                             Html.td [
                                                 prop.text kind
                                                 if isError then color.hasTextDanger
                                                 else color.hasTextInfo
                                             ]
-                                            Html.td (String.visual string)
+                                            Html.td
+                                                (lexeme
+                                                |> Regexp.escape
+                                                |> String.visual)
                                             Html.td [
                                                 prop.text (sprintf "%d" position)
                                                 color.hasTextLink

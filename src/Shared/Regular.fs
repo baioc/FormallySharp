@@ -339,7 +339,7 @@ module Dfa =
           Accepting = Set.map stateMapping dfa.Accepting }
 
     /// Transforms a DFA by filtering its transitions.
-    // TODO: test this, as well as the NFA filter
+    // TODO: write tests for this, as well as for the NFA filter
     let filter transitionFilter (dfa: Dfa<_, _>) =
         { dfa with
               Transitions = Map.filter transitionFilter dfa.Transitions }

@@ -1,4 +1,3 @@
-/// Miscellaneous stuff that is used by both Client and Server.
 namespace Shared
 
 open System.Text.RegularExpressions
@@ -10,19 +9,35 @@ open Formally.Converter
 
 
 module Regexp =
-    let tryParse (str: string) =
-        let str = System.String.Concat(str.Split(' '))
+    /// Unescapes some sequences into their "raw" characters.
+    let unescape (str: string) =
+        // XXX: for some reason, this works while `Regex.Replace` doesn't
+        str.Replace(@"\t",   "\t")
+           .Replace(@"\r\n", "\r\n")
+           .Replace(@"\n",   "\n")
+           .Replace(@"\\",   "\\")
+
+    /// The inverse of `unescape`.
+    let escape (str: string) =
+        str.Replace("\\",   @"\\")
+           .Replace("\t",   @"\t")
+           .Replace("\r\n", @"\r\n")
+           .Replace("\n",   @"\n")
+
+    let tryParse str =
+        let str = unescape str
+        // FIXME: even when input is not valid, this will still give a (weird) regexp
         Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
 
 [<Extension>]
 module String =
     /// Returns an escaped version of given string for user visibility.
-    let visual str =
-        let str = Regex.Replace(str, "\n", "\\n")
-        let str = Regex.Replace(str, "\t", "\\t")
-        let str = Regex.Replace(str, " ", "\u00B7")
-        str
+    let visual (str: string) =
+        str.Replace("\r\n", "\\r\\n")
+           .Replace("\n", "\\n")
+           .Replace("\t", "\\t")
+           .Replace(" ", "\u00B7") // <- unicode for visual space
 
 /// Regexp with a user-facing string representation.
 [<AutoOpen>] // so that we may use unqualified constructors
@@ -32,9 +47,6 @@ type UserRegexp =
 
     static member UserRegexp(string, regexp) =
         { String = string; Regexp = regexp }
-
-    override this.ToString() =
-        $"/{String.visual this.String}/"
 
 type TokenPriority = int
 
@@ -60,22 +72,7 @@ type LexerState =
     | AcceptSeparator of Identifier
     | Intermediary of Identifier
 
-type TokenInstance =
-    { Token: Identifier
-      Lexeme: string
-      Position: uint }
-
-type LexicalError =
-    { String: string
-      Position: uint }
-
-type LexerOutput =
-    | Token of TokenInstance
-    | Error of LexicalError
-    | Nothing
-    | Unget of char
-
-/// Wraps a DFA into a ready-to-use lexer.
+/// Current lexer state over some input.
 type Lexer =
     { Automaton: Dfa<Set<LexerState>>
       Initial: Set<LexerState>
@@ -83,103 +80,19 @@ type Lexer =
       Start: uint
       Position: uint }
 
-    interface IAutomaton<Identifier, char, LexerOutput> with
-        override this.View =
-            Set.toSeq this.Automaton.Current
-            |> Seq.map
-                (function
-                | AcceptToken (label, _)
-                | AcceptSeparator label
-                | Intermediary label -> label)
-            |> String.concat "|"
+type TokenInstance =
+    { Token: Identifier
+      Lexeme: string
+      Position: uint }
 
-        override this.Step input =
-            // add input to the buffer and feed it to the automaton
-            let previous = this.Automaton.Current
-            let wasAccepting = Set.contains previous this.Automaton.Accepting
-            let next = Automaton.step input this.Automaton |> snd |> Automaton.view
-            let updatedString = this.String + (sprintf "%c" input)
-            let nextPosition = this.Position + 1u
-
-            // transition: dead -> * ? try to get out of panic mode
-            if previous = this.Automaton.Dead then
-                let next =
-                    { this.Automaton with Current = this.Initial }
-                    |> Automaton.step input
-                    |> snd
-                    |> Automaton.view
-
-                // dead -> accepting ? escape panic mode
-                if Set.contains next this.Automaton.Accepting then
-                    Unget input,
-                    { this with
-                          String = ""
-                          Start = this.Position
-                          Automaton = { this.Automaton with Current = this.Initial }
-                    } :> IAutomaton<_, _, _>
-                // dead -> not-accepting ? keep accumulating errors
-                else
-                    Error { String = updatedString; Position = this.Start },
-                    { this with
-                          String = updatedString
-                          Position = nextPosition
-                          Automaton = { this.Automaton with Current = this.Automaton.Dead }
-                    } :> IAutomaton<_, _, _>
-
-            // transition: not-accepting -> dead ? error and go into panic mode
-            elif next = this.Automaton.Dead && not wasAccepting then
-                Error { String = updatedString; Position = this.Start },
-                { this with
-                      String = updatedString
-                      Position = nextPosition
-                      Automaton = { this.Automaton with Current = this.Automaton.Dead }
-                } :> IAutomaton<_, _, _>
-
-            // transition: accepting -> dead ? generate a token depending on the state
-            elif next = this.Automaton.Dead && wasAccepting then
-                // choose the accepting state with the highest priority
-                let acceptLabel =
-                    Set.toSeq previous
-                    |> Seq.map
-                        (fun label ->
-                            match label with
-                            | Intermediary _ -> System.Int64.MinValue, label
-                            | AcceptSeparator _ -> System.Int64.MinValue + 1L, label
-                            | AcceptToken (_, priority) -> int64 priority, label)
-                    |> Seq.maxBy fst
-                    |> snd
-
-                // output is only some token instance when the accepting state refers to a token
-                let output =
-                    match acceptLabel with
-                    | AcceptSeparator _ -> Unget input
-                    | AcceptToken (token, _) ->
-                        Token { Token = token
-                                Lexeme = this.String
-                                Position = this.Start }
-                    | Intermediary _ -> Nothing // <- unreachable
-
-                // since *something* was accepted, we reset both the buffer and the automaton,
-                // then, it is up to the caller to try this input again
-                output,
-                { this with
-                      String = ""
-                      Start = this.Position
-                      Automaton = { this.Automaton with Current = this.Initial }
-                } :> IAutomaton<_, _, _>
-
-            // otherwise, keep going with the updated buffer and automaton state
-            else
-                Nothing,
-                { this with
-                      String = updatedString
-                      Position = nextPosition
-                      Automaton = { this.Automaton with Current = next }
-                } :> IAutomaton<_, _, _>
+type LexicalError =
+    { String: char seq
+      Position: uint }
 
 /// Functions for creating and manipulating lexers.
+// TODO: write tests for these
 module Lexer =
-    /// Builds a Lexer from the given specification.
+    /// Builds a Lexer with a clean state according to the given specification.
     let make spec =
         let makeAutomaton name regexp =
             let automaton = Dfa.ofRegexp regexp
@@ -194,7 +107,7 @@ module Lexer =
                     |> String.concat ","
                     |> sprintf "%s:{%s}" name // prefix is unique
 
-            // mark final states and convert to NFA before union
+            // mark final states and prepare for union
             automaton
             |> Dfa.map markFinal
             |> Dfa.toNfa
@@ -215,7 +128,7 @@ module Lexer =
                     match def with
                     | TokenClass (r, _)
                     | Separator r -> Some (makeAutomaton name r.Regexp)
-                    | Fragment r -> None)
+                    | Fragment _ -> None)
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
@@ -236,62 +149,93 @@ module Lexer =
                     |> Seq.map
                         (fun state ->
                             match Map.tryFind state spec with
-                            | None | Some (Fragment _) -> Intermediary state
                             | Some (TokenClass (r, priority)) -> AcceptToken (state, priority)
-                            | Some (Separator r) -> AcceptSeparator state)
+                            | Some (Separator r) -> AcceptSeparator state
+                            | notAccepting -> Intermediary state)
                     |> Set.ofSeq)
 
         { Automaton = automaton; Initial = automaton.Current
           String = ""; Start = 0u; Position = 0u }
 
-    /// Generates tokens and/or errors by an input sequence.
-    let rec tokenize (lexer: IAutomaton<_, char, LexerOutput>) inputs =
-        seq {
-            // when the input stream is empty, check what state we ended up in
-            if Seq.isEmpty inputs then
-                let eof = '\u0000' // fake input, we don't care if it rejects
-                let output, _ = Automaton.step eof lexer
-                match output with
-                | Token last -> yield Ok last
-                | notToken -> ()
+    /// Makes a token iff the lexer is currently accepting a non-empty lexeme.
+    let private tryMakeToken lexer =
+        if lexer.Automaton.Current = Set.empty then
+            None // ^ dead state, so obviously not accepting
+        elif lexer.String = "" then
+            None // a lexer must never produce a token from an empty lexeme
+        else
+            // choose the state with the highest priority
+            let acceptLabel =
+                Set.toSeq lexer.Automaton.Current
+                |> Seq.map
+                    (fun label ->
+                        match label with
+                        | Intermediary _ -> System.Int64.MinValue, label
+                        | AcceptSeparator _ -> System.Int64.MinValue + 1L, label
+                        | AcceptToken (_, priority) -> int64 priority, label)
+                |> Seq.maxBy fst
+                |> snd
+            // ensure we're actually accepting a token
+            match acceptLabel with
+            | AcceptToken (token, priority) ->
+                Some { Token = token
+                       Lexeme = lexer.String
+                       Position = lexer.Start }
+            | notToken -> None
 
-            // otherwise, iterate down the input stream
+    /// Checks whether the lexer is in an accepting state.
+    let private isAccepting lexer =
+        Set.contains lexer.Automaton.Current lexer.Automaton.Accepting
+
+    /// Lazily generate tokens by an input sequence up until the first error.
+    let rec tokenize lexer inputs = seq {
+        // when the input is over, check what state we ended up in
+        if Seq.isEmpty inputs then
+            if isAccepting lexer then
+                match tryMakeToken lexer with
+                | Some lastToken -> yield Ok lastToken
+                | None -> ()
             else
-                let input = Seq.head inputs
-                let output, lexer = Automaton.step input lexer
+                let error = { Position = lexer.Start; String = lexer.String }
+                yield Error error // aka "unexpected end of file ..."
 
-                // define how to continue based on output
-                match output with
-                // "ungetc" due to lookahead
-                | Token token ->
-                    yield Ok token
-                    yield! tokenize lexer inputs
-                | Unget c ->
-                    yield! tokenize lexer inputs
+        // otherwise, apply transition logic and iterate down the input stream
+        else
+            let wasAccepting = isAccepting lexer
+            let input = Seq.head inputs
+            let nextState = Automaton.step input lexer.Automaton |> snd |> Automaton.view
+            let justDied = nextState = lexer.Automaton.Dead
 
-                // skip errors (all but the last) until we leave panic mode
-                | Error error ->
-                    let mutable lastError = error
-                    let isError = function Error e -> true | notError -> false
-                    let mutable lexer = lexer
-                    let mutable inputs = Seq.tail inputs
-                    let mutable output = output
-                    while not (Seq.isEmpty inputs) && isError output do
-                        let out, next = Automaton.step (Seq.head inputs) lexer
-                        output <- out
-                        match out with
-                        | Error error ->
-                            lexer <- next
-                            inputs <- Seq.tail inputs
-                            lastError <- error
-                        | notError -> ()
-                    yield Result.Error lastError
-                    yield! tokenize lexer inputs
+            if justDied && wasAccepting && lexer.String <> "" then
+                // if accepting a token, emit it
+                match tryMakeToken lexer with
+                | Some token -> yield Ok token
+                | None -> ()
 
-                // simply keep going
-                | Nothing ->
-                    yield! tokenize lexer (Seq.tail inputs)
-        }
+                // since the condition above avoids empty strings, we can reset the
+                // DFA and recurse with the same inputs without going infinite
+                let lexer =
+                    { lexer with
+                          Automaton = { lexer.Automaton with Current = lexer.Initial }
+                          String = ""
+                          Start = lexer.Position // change where the next lexeme begins
+                          Position = lexer.Position }
+                yield! tokenize lexer inputs
+
+            elif justDied && (not wasAccepting) then
+                // make an error containing all input from this point forward
+                yield Error { Position = lexer.Start
+                              String = Seq.append lexer.String inputs }
+
+            else
+                // otherwise, keep going with the updated lexer
+                let lexer =
+                    { lexer with
+                          Automaton = { lexer.Automaton with Current = nextState }
+                          String = lexer.String + (string input)
+                          Position = lexer.Position + 1u }
+                yield! tokenize lexer (Seq.tail inputs)
+    }
 
 
 /// Defines the API between our web app and server backend.
