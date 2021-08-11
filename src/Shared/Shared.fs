@@ -9,13 +9,23 @@ open Formally.Converter
 
 
 module Regexp =
-    let tryParse (str: string) =
-        // unescape some literals known to be safe
+    /// Unescapes some sequences into their "raw" characters.
+    let unescape (str: string) =
         // XXX: for some reason, this works while `Regex.Replace` doesn't
-        let str = str.Replace("\\t", "\t")
-                     .Replace("\\r\\n", "\r\n")
-                     .Replace("\\n", "\n")
-                     .Replace("\\\\", "\\")
+        str.Replace(@"\t",   "\t")
+           .Replace(@"\r\n", "\r\n")
+           .Replace(@"\n",   "\n")
+           .Replace(@"\\",   "\\")
+
+    /// The inverse of `unescape`.
+    let escape (str: string) =
+        str.Replace("\\",   @"\\")
+           .Replace("\t",   @"\t")
+           .Replace("\r\n", @"\r\n")
+           .Replace("\n",   @"\n")
+
+    let tryParse str =
+        let str = unescape str
         // FIXME: even when input is not valid, this will still give a (weird) regexp
         Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
@@ -24,8 +34,7 @@ module Regexp =
 module String =
     /// Returns an escaped version of given string for user visibility.
     let visual (str: string) =
-        str.Replace("\\", "\\\\")
-           .Replace("\r\n", "\\r\\n")
+        str.Replace("\r\n", "\\r\\n")
            .Replace("\n", "\\n")
            .Replace("\t", "\\t")
            .Replace(" ", "\u00B7") // <- unicode for visual space
@@ -38,9 +47,6 @@ type UserRegexp =
 
     static member UserRegexp(string, regexp) =
         { String = string; Regexp = regexp }
-
-    override this.ToString() =
-        $"/{String.visual this.String}/"
 
 type TokenPriority = int
 
@@ -206,7 +212,7 @@ module Lexer =
                 | Some token -> yield Ok token
                 | None -> ()
 
-                // since the condition above avoids empty strings, we can  reset the
+                // since the condition above avoids empty strings, we can reset the
                 // DFA and recurse with the same inputs without going infinite
                 let lexer =
                     { lexer with

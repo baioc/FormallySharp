@@ -310,7 +310,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
 #if DEBUG                   // during development, show Regexp tree
                             prop.text (string userRegexp.Regexp)
 #else                       // on release, show user-facing regex
-                            prop.text (string userRegexp)
+                            prop.text (String.visual userRegexp.String)
 #endif
                             text.isFamilyCode
                         ]
@@ -521,7 +521,7 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                 ]
                                 Html.tbody [
                                     for entry in symbolTable do
-                                        let kind, string, position, isError =
+                                        let kind, lexeme, position, isError =
                                             match entry with
                                             | Ok token ->
                                                 token.Token, token.Lexeme, token.Position, false
@@ -537,7 +537,10 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                                 if isError then color.hasTextDanger
                                                 else color.hasTextInfo
                                             ]
-                                            Html.td (String.visual string)
+                                            Html.td
+                                                (lexeme
+                                                |> Regexp.escape
+                                                |> String.visual)
                                             Html.td [
                                                 prop.text (sprintf "%d" position)
                                                 color.hasTextLink
