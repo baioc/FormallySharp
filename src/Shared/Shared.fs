@@ -132,22 +132,20 @@ module Lexer =
             union
             |> Dfa.filter (fun (q, a) q' -> q' <> set [ dead ])
             |> Dfa.map
-                (fun s ->
-                    s
-                    |> Seq.filter (fun state -> state <> dead)
-                    |> Seq.map
-                        (fun (prefix, state) ->
-                            if Set.contains s union.Accepting then
+                (fun state ->
+                    Set.map
+                        (fun (prefix, discriminant) ->
+                            if Set.contains state union.Accepting then
                                 match Map.tryFind prefix spec with
                                 | Some (TokenClass (r, priority)) ->
-                                    AcceptToken (prefix, state, priority)
+                                    AcceptToken (prefix, discriminant, priority)
                                 | Some (Separator r) ->
-                                    AcceptSeparator (prefix, state)
+                                    AcceptSeparator (prefix, discriminant)
                                 | notAccepting ->
-                                    Intermediary (prefix, state)
+                                    Intermediary (prefix, discriminant)
                             else
-                                Intermediary (prefix, state))
-                    |> Set.ofSeq)
+                                Intermediary (prefix, discriminant))
+                        state)
 
         { Automaton = automaton; Initial = automaton.Current
           String = ""; Start = 0u; Position = 0u }
