@@ -68,9 +68,9 @@ type Project =
       Lexer: LexicalSpecification }
 
 type LexerState =
-    | AcceptToken of Identifier * TokenPriority
-    | AcceptSeparator of Identifier
-    | Intermediary of Identifier
+    | AcceptToken of Identifier * Set<int> * TokenPriority
+    | AcceptSeparator of Identifier * Set<int>
+    | Intermediary of Identifier * Set<int>
 
 /// Current lexer state over some input.
 type Lexer =
@@ -94,31 +94,13 @@ type LexicalError =
 module Lexer =
     /// Builds a Lexer with a clean state according to the given specification.
     let make spec =
+        let dead = ("", Set.empty)
         let makeAutomaton name regexp =
-            let automaton = Dfa.ofRegexp regexp
-
-            let markFinal state =
-                if Set.contains state automaton.Accepting then
-                    name // guaranteed singleton since generated with Aho's algorithm
-                elif state = Set.empty then
-                    "{}" // dead state can be shared
-                else
-                    Set.map string state
-                    |> String.concat ","
-                    |> sprintf "%s:{%s}" name // prefix is unique
-
-            // mark final states and prepare for union
-            automaton
-            |> Dfa.map markFinal
-            |> Dfa.toNfa
-
-        let undiscriminatedUnion union nfa =
-            Nfa.union union nfa
-            |> Nfa.map
-                (fun state -> // maintains structure due to uniqueness of names
-                    match state with
-                    | Choice1Of2 s
-                    | Choice2Of2 s -> s)
+            Dfa.ofRegexp regexp
+            |> Dfa.map
+                (fun state -> // dead states can be shared
+                    if state = Set.empty then dead
+                    else (name, state))
 
         // make an automaton for each token and separator
         let automatons =
@@ -126,32 +108,45 @@ module Lexer =
             |> Seq.choose
                 (fun (name, def) ->
                     match def with
+                    | Fragment _ -> None
                     | TokenClass (r, _)
-                    | Separator r -> Some (makeAutomaton name r.Regexp)
-                    | Fragment _ -> None)
+                    | Separator r -> Some <| makeAutomaton name r.Regexp)
+
+        let undiscriminatedUnion union dfa =
+            Dfa.toNfa dfa
+            |> Nfa.union union
+            |> Nfa.map // maintains structure due to uniqueness of names
+                (function Choice1Of2 s | Choice2Of2 s -> s)
 
         let initial =
             { Transitions = Map.empty; Accepting = set []; Current = set [] }
 
-        let automaton =
-            // compute the union of all automatons
+        // compute the determinized union of all automatons
+        let union =
             automatons
             |> Seq.fold undiscriminatedUnion initial
-            // determinze the result
             |> Nfa.toDfa
-            // filter out dead transitions
-            |> Dfa.filter (fun (q, a) q' -> q' <> set [ "{}" ])
-            // identify lexer states
+
+        // filter out dead transitions and identify accepting states
+        let automaton =
+            union
+            |> Dfa.filter (fun (q, a) q' -> q' <> set [ dead ])
             |> Dfa.map
-                (fun set ->
-                    set
-                    |> Seq.filter (fun state -> state <> "{}")
+                (fun s ->
+                    s
+                    |> Seq.filter (fun state -> state <> dead)
                     |> Seq.map
-                        (fun state ->
-                            match Map.tryFind state spec with
-                            | Some (TokenClass (r, priority)) -> AcceptToken (state, priority)
-                            | Some (Separator r) -> AcceptSeparator state
-                            | notAccepting -> Intermediary state)
+                        (fun (prefix, state) ->
+                            if Set.contains s union.Accepting then
+                                match Map.tryFind prefix spec with
+                                | Some (TokenClass (r, priority)) ->
+                                    AcceptToken (prefix, state, priority)
+                                | Some (Separator r) ->
+                                    AcceptSeparator (prefix, state)
+                                | notAccepting ->
+                                    Intermediary (prefix, state)
+                            else
+                                Intermediary (prefix, state))
                     |> Set.ofSeq)
 
         { Automaton = automaton; Initial = automaton.Current
@@ -165,19 +160,19 @@ module Lexer =
             None // a lexer must never produce a token from an empty lexeme
         else
             // choose the state with the highest priority
-            let acceptLabel =
+            let state =
                 Set.toSeq lexer.Automaton.Current
                 |> Seq.map
-                    (fun label ->
-                        match label with
-                        | Intermediary _ -> System.Int64.MinValue, label
-                        | AcceptSeparator _ -> System.Int64.MinValue + 1L, label
-                        | AcceptToken (_, priority) -> int64 priority, label)
+                    (fun state ->
+                        match state with
+                        | Intermediary _ -> System.Int64.MinValue, state
+                        | AcceptSeparator _ -> System.Int64.MinValue + 1L, state
+                        | AcceptToken (_, _, priority) -> int64 priority, state)
                 |> Seq.maxBy fst
                 |> snd
             // ensure we're actually accepting a token
-            match acceptLabel with
-            | AcceptToken (token, priority) ->
+            match state with
+            | AcceptToken (token, state, priority) ->
                 Some { Token = token
                        Lexeme = lexer.String
                        Position = lexer.Start }
