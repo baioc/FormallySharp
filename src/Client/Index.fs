@@ -184,6 +184,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                         | notFragment -> None)
                 |> Map.ofSeq
             // inline fragments (if any), then parse the regex
+            // FIXME: changing a fragment doesn't change regexps it is included in
             Converter.convertTokenToRegexString(body, fragments)
             |> Regexp.tryParse
 
