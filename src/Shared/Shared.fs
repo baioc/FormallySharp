@@ -58,7 +58,7 @@ type RegularDefinition =
 type Identifier = string
 
 module Identifier =
-    let isValid str = Regex.IsMatch(str, @"\w+")
+    let isValid str = Regex.IsMatch(str, @"^\w(\w|\d)*$")
 
 type LexicalSpecification = Map<Identifier, RegularDefinition>
 

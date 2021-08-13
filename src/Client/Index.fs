@@ -313,7 +313,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
 #else                       // on release, show user-facing regex
                             prop.text (String.visual userRegexp.String)
 #endif
-                            text.isFamilyCode
+                            text.isFamilyMonospace
                         ]
                     ]
                 ]
@@ -431,6 +431,7 @@ let project (spec: Map<string, RegularDefinition>) (kind, name, body) (dispatch:
                                     |> SetRegularDefinitionText
                                     |> dispatch)
                             if not nameIsValid then color.isDanger
+                            text.isFamilyMonospace
                         ]
                     ]
                 ]
@@ -487,8 +488,9 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                         prop.custom ("rows", 24)
                         prop.onChange (SetInputText >> dispatch)
                         prop.disabled (Option.isNone lexer)
-                        prop.placeholder (if Option.isSome lexer then "Forneça uma entrada ao lexer."
-                                          else "O lexer ainda não foi gerado.")
+                        prop.placeholder
+                            (if Option.isSome lexer then "Forneça uma entrada ao lexer."
+                             else "O lexer ainda não foi gerado.")
                     ]
                 ]
             ]
@@ -526,7 +528,7 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                             match entry with
                                             | Ok token ->
                                                 token.Token, token.Lexeme, token.Position, false
-                                            | Result.Error error ->
+                                            | Error error ->
                                                 let pseudoLexeme =
                                                     error.String
                                                     |> Seq.map (sprintf "%c")
@@ -538,10 +540,12 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                                 if isError then color.hasTextDanger
                                                 else color.hasTextInfo
                                             ]
-                                            Html.td
-                                                (lexeme
-                                                |> Regexp.escape
-                                                |> String.visual)
+                                            Html.td [
+                                                prop.text
+                                                    (lexeme
+                                                    |> Regexp.escape
+                                                    |> String.visual)
+                                            ]
                                             Html.td [
                                                 prop.text (sprintf "%d" position)
                                                 color.hasTextLink
@@ -606,22 +610,20 @@ let toolbar (project: Project) (dispatch: Msg -> unit) =
     Bulma.level [
         prop.children [
             Bulma.levelLeft [
-                Bulma.levelItem [
-                    // project mode selector
-                    Bulma.tabs [
-                        tabs.isBoxed
-                        prop.children [
-                            Html.ul [
-                                Bulma.tab [
-                                    tab.isActive
-                                    prop.children [
-                                        Html.a [ prop.text "Lexicon" ]
-                                    ]
+                // project mode selector
+                Bulma.tabs [
+                    tabs.isBoxed
+                    prop.children [
+                        Html.ul [
+                            Bulma.tab [
+                                tab.isActive
+                                prop.children [
+                                    Html.a [ prop.text "Lexicon" ]
                                 ]
-                                Bulma.tab [
-                                    prop.children [
-                                        Html.a [ prop.text "Sintaxe" ]
-                                    ]
+                            ]
+                            Bulma.tab [
+                                prop.children [
+                                    Html.a [ prop.text "Sintaxe" ]
                                 ]
                             ]
                         ]
