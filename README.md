@@ -1,6 +1,9 @@
 # Formally#
 
-Formally# is an online formal language designer.<br/>
+![GitHub top language](https://img.shields.io/github/languages/top/baioc/FormallySharp?color=%2330b9db)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/baioc/FormallySharp)
+
+Formally# is an online formal language designer.
 **Check it out at [www.formallysharp.codes](http://www.formallysharp.codes)**
 
 
@@ -10,9 +13,10 @@ This is a full-stack web application using the [SAFE Stack](https://safe-stack.g
 
 ![SAFE](https://www.compositional-it.com/wp-content/uploads/2019/09/safe-1.png)
 
-Other than the prototypical SAFE components (**S**aturn running on an **A**zure server and **F**able **E**lmish to compile a SPA client), we also depend on:
+Other than the prototypical SAFE components, we also depend on:
 * [Fable.Remoting](https://zaid-ajaj.github.io/Fable.Remoting/) for our RPC communication layer
 * [Feliz](https://zaid-ajaj.github.io/Feliz/) for client-side rendering, styled with [Feliz.Bulma](https://dzoukr.github.io/Feliz.Bulma/#/api-description)
+* [LiteDB](https://www.litedb.org/) for simple data persistency in the cloud
 
 
 ## Dev Setup
@@ -53,8 +57,7 @@ Concurrently runs server and client tests in watch mode:
 $ dotnet run tests
 ```
 
-Client test results can be seen at [localhost:8008](http://localhost:8008)<br/>
-Server results are printed directly to the console.
+Client test results can be seen at [localhost:8008](http://localhost:8008) and server results are printed directly to the console.
 
 #### Deploy
 
@@ -62,10 +65,4 @@ Builds the project in release mode, packaging it in the `deploy/` folder:
 
 ```sh
 $ dotnet run bundle
-```
-
-If you have Azure CLI installed in your system, this rule deploys the project to **your account**:
-
-```sh
-$ dotnet run azure
 ```
