@@ -237,6 +237,18 @@ module Nfa =
             Expect.equal abbaEps (set [ "$" ]) "Closure from a state should contain itself"
             Expect.equal cyclicEps (set [ 'A'; 'B'; 'C' ]) "Should work with cyclic closures"
 
+        testCase "Map and filter" <| fun _ ->
+            let namedEven =
+                even
+                |> Dfa.map (function 0 -> "zero" | 1 -> "odd" | 2 -> "even" | _ -> "dead")
+            Expect.equal namedEven.States (set [ "dead"; "zero"; "odd"; "even" ])
+                "Map should transform all states"
+            let unaryEven =
+                even
+                |> Dfa.filter (fun (_, symbol) _ -> symbol <> '0')
+            Expect.equal unaryEven.Alphabet (set [ '1' ])
+                "Filter should have removed all references to zero"
+
         testCase "DFA indeterminization" <| fun _ ->
             let nondetEven =
                 { Current = set [ 0 ]
