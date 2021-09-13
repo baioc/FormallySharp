@@ -233,7 +233,7 @@ module Lexer =
 type Project =
     { Id: Identifier
       Lexicon: LexicalSpecification
-      Syntax: Grammar<Identifier> }
+      Syntax: Grammar<Identifier, Identifier> }
 
 
 /// Defines the API between our web app and server backend.
