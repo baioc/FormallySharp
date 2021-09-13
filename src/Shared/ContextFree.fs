@@ -49,14 +49,15 @@ module Grammar =
         match symbol with 
         | Terminal t -> Set.singleton t
         | NonTerminal n -> 
-            nonTerminalRules = Set.filter (fun (head, body) -> head = n) grammar.Rules
+            nonTerminalRules <- Set.filter (fun (head, body) -> head = n) grammar.Rules
             for rule in nonTerminalRules do
                 if (rule.body[0] = Terminal) then
-                    output.add rule.body[0]
+                    output <- output.Add rule.body[0]
                 elif (rule.body[0] = None) then
-                    output.add None
+                    output <- output.Add None
                 else
-                    output.add(first rule.body[0] grammar)
+                    output <- output + (first rule.body[0] grammar)
+            output
 
         
 
