@@ -25,7 +25,7 @@ type Storage() =
     member __.GetProject(id) =
         projects.findOne <@ fun project -> project.Id = id @>
 
-    /// Saves a project to the database. Always overwrites.
+    /// Saves a project to the database. NOTE: Always overwrites.
     member __.SaveProject(project: Project) =
         match projects.tryFindOne <@ fun p -> p.Id = project.Id @> with
         | None -> projects.Insert(project) |> ignore
