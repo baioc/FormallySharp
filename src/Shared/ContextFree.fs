@@ -39,3 +39,23 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
         |> Seq.map (fun (head, body) -> nonTerminals body |> Set.add head)
         |> Set.unionMany
         |> Set.add this.Initial
+
+[<RequireQualifiedAccess>]
+module Grammar =
+    let first (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>) : Set<Symbol<'T, 'N>> =
+        failwith "TODO: first"
+
+    let follow (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>): Set<Symbol<'T, 'N>> =
+        failwith "TODO: follow"
+
+    let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
+        failwith "TODO: eliminateLeftRecursions"
+
+    let leftFactor (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
+        failwith "TODO: leftFactor"
+
+
+// TODO: deterministic pushdown automaton (DPDA)
+
+
+// TODO: generate LL(1) parser
