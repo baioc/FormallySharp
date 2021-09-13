@@ -6,8 +6,8 @@
     <Compile Include="Automata.Tests.fs" />
     <Compile Include="Regular.Tests.fs" />
     <Compile Include="Converter.Tests.fs" />
-    <Compile Include="Shared.Tests.fs" />
     <Compile Include="ContextFree.Tests.fs" />
+    <Compile Include="Shared.Tests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Shared\Shared.fsproj" />

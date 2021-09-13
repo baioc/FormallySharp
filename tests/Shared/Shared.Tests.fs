@@ -15,6 +15,7 @@ module Shared =
     open Formally.Automata.Tests
     open Formally.Regular.Tests
     open Formally.Converter.Tests
+    open Formally.ContextFree.Tests
 
     let tests = testList "Shared" [
         // internal libraries
@@ -22,6 +23,7 @@ module Shared =
         Regexp.tests
         Nfa.tests
         Converter.tests
+        ContextFree.tests
 
         // shared application-specific logic
         testList "Business Logic" [

@@ -13,7 +13,7 @@ module ContextFree =
 
     let tests = testList "First" [
         testCase "primeiro" <| fun _ ->
-            let string = "oi"
-            let teste = Set.add(string)
-            Expect.equal(Grammar.first()) (teste) "deu boa"
+            let string = "Oi"
+            let teste = Set.add string Set.empty
+            Expect.equal (Grammar.first (Terminal "oi" ) { Initial = "inicial"; Rules = Set.empty } ) (teste) "deu erro"
     ]

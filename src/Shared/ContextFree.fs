@@ -5,7 +5,7 @@ namespace Formally.ContextFree
 
 /// Disjoint union of grammar terminal and non-terminal symbols: `T + N`.
 type Symbol<'T, 'N> =
-    | Terminal of 'T
+    | Terminal of Option<'T>
     | NonTerminal of 'N
 
 /// Represents the (possibly empty) body of a production rule: `(T + N)*`.
@@ -42,10 +42,25 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
 
 [<RequireQualifiedAccess>]
 module Grammar =
-    let first (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>) : Set<Symbol<'T, 'N>> =
-        failwith "TODO: first"
+// não conseguimos pensar em como fazer isso na sintaxe dele, mas a gnt tentou deixar a ideia pra ver ctg Baiocchi
+    let rec first (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>) : Set<Option<'T>> =
+        let mutable nonTerminalRules = Set.empty
+        let mutable output = Set.empty
+        match symbol with 
+        | Terminal t -> Set.singleton t
+        | NonTerminal n -> 
+            nonTerminalRules = Set.filter (fun (head, body) -> head = n) grammar.Rules
+            for rule in nonTerminalRules do
+                if (rule.body[0] = Terminal) then
+                    output.add rule.body[0]
+                elif (rule.body[0] = None) then
+                    output.add None
+                else
+                    output.add(first rule.body[0] grammar)
 
-    let follow (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>): Set<Symbol<'T, 'N>> =
+        
+
+    let follow (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>): Set<Option<'T>> =
         failwith "TODO: follow"
 
     let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
