@@ -42,7 +42,7 @@ let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
           Lexicon = Map.empty
-          Syntax = { Initial = ""; Rules = Map.empty } }
+          Syntax = { Initial = ""; Rules = Set.empty } }
 
     let model =
         { Project = emptyProject
