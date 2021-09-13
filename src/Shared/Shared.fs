@@ -5,9 +5,27 @@ open System.Runtime.CompilerServices
 
 open Formally.Automata
 open Formally.Regular
+open Formally.ContextFree
 open Formally.Converter
 
 
+/// Represents a valid string to be used as an identifier for syntax rules.
+type Identifier = string
+
+module Identifier =
+    let isValid str = Regex.IsMatch(str, @"^[A-Za-z_]\w*$")
+
+[<Extension>]
+module String =
+    /// Returns an escaped version of given string for user visibility.
+    let visual (str: string) =
+        str.Replace("\r\n", "\\r\\n")
+           .Replace("\n", "\\n")
+           .Replace("\t", "\\t")
+           .Replace(" ", "\u00B7") // <- unicode for visual space
+
+
+[<Extension>]
 module Regexp =
     /// Unescapes some sequences into their "raw" characters.
     let unescape (str: string) =
@@ -29,17 +47,7 @@ module Regexp =
         // FIXME: even when input is not valid, this will still give a (weird) regexp
         Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
-
-[<Extension>]
-module String =
-    /// Returns an escaped version of given string for user visibility.
-    let visual (str: string) =
-        str.Replace("\r\n", "\\r\\n")
-           .Replace("\n", "\\n")
-           .Replace("\t", "\\t")
-           .Replace(" ", "\u00B7") // <- unicode for visual space
-
-/// Regexp with a user-facing string representation.
+/// Regexp with a user-provided string representation.
 [<AutoOpen>] // so that we may use unqualified constructors
 type UserRegexp =
     { Regexp: Regexp
@@ -55,17 +63,7 @@ type RegularDefinition =
     | Fragment of UserRegexp
     | Separator of UserRegexp
 
-type Identifier = string
-
-module Identifier =
-    let isValid str = Regex.IsMatch(str, @"^\w(\w|\d)*$")
-
 type LexicalSpecification = Map<Identifier, RegularDefinition>
-
-/// A formal language project.
-type Project =
-    { Id: Identifier
-      Lexer: LexicalSpecification }
 
 type LexerState =
     | AcceptToken of Identifier * Set<int> * TokenPriority
@@ -85,12 +83,12 @@ type TokenInstance =
       Lexeme: string
       Position: uint }
 
+/// Indicates a lexical error and keeps track of non-lexed input.
 type LexicalError =
     { String: char seq
       Position: uint }
 
 /// Functions for creating and manipulating lexers.
-// TODO: write tests for these
 module Lexer =
     /// Builds a Lexer with a clean state according to the given specification.
     let make spec =
@@ -229,6 +227,13 @@ module Lexer =
                           Position = lexer.Position + 1u }
                 yield! tokenize lexer (Seq.tail inputs)
     }
+
+
+/// A formal language project.
+type Project =
+    { Id: Identifier
+      Lexicon: LexicalSpecification
+      Syntax: Grammar<Identifier> }
 
 
 /// Defines the API between our web app and server backend.

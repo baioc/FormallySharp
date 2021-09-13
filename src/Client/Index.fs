@@ -41,7 +41,8 @@ let api =
 let init () : Model * Cmd<Msg> =
     let emptyProject =
         { Id = ""
-          Lexer = Map.empty }
+          Lexicon = Map.empty
+          Syntax = { Initial = ""; Rules = Map.empty } }
 
     let model =
         { Project = emptyProject
@@ -59,9 +60,9 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
               RegularDefinitionText = kind, name, body },
         Cmd.none
 
-    | ChangeRegularDefinitions lexer ->
+    | ChangeRegularDefinitions lexicon ->
         { model with
-              Project = { model.Project with Lexer = lexer } },
+              Project = { model.Project with Lexicon = lexicon } },
         Cmd.none
 
     | GenerateLexer spec ->
@@ -541,10 +542,7 @@ let recognition (lexer: Lexer option) (symbolTable: Result<TokenInstance, Lexica
                                                 else color.hasTextInfo
                                             ]
                                             Html.td [
-                                                prop.text
-                                                    (lexeme
-                                                    |> Regexp.escape
-                                                    |> String.visual)
+                                                prop.text (String.visual lexeme)
                                             ]
                                             Html.td [
                                                 prop.text (sprintf "%d" position)
@@ -573,7 +571,7 @@ let main (model: Model) (dispatch: Msg -> unit) =
     let projectInterface =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
-            Bulma.cardContent [ project model.Project.Lexer model.RegularDefinitionText dispatch ]
+            Bulma.cardContent [ project model.Project.Lexicon model.RegularDefinitionText dispatch ]
         ]
 
     let recognitionInterface =
