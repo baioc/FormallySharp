@@ -73,20 +73,30 @@ module Grammar =
                     (first rest grammar)
 
     /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
-    let follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
-        failwith "TODO: follow"
-        // let mutable rulesWhereNonTerminalAppears = Set.empty
-        // let mutable output = Set.empty
-        // match symbol with
-        // | Terminal t -> Set.empty
-        // | NonTerminal n ->
-        //     if (n = grammar.Rules[0]) then
-        //         output <- output.Add(Set.empty.add(Terminal '$'))
-        //     rulesWhereNonTerminalAppears <- Set.filter (fun (head, body) -> body = n) grammar.Rules
-        //     for rule in rulesWhereNonTerminalAppears do
-        //         for production in rule do
-        //             None
-        //     output
+    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
+        let mutable followSet = Set.empty
+        if (symbol = grammar.Rules.[0].head) then
+            followSet <- followSet.Add(Terminal '$')
+        else
+            for rule in grammar.Rules do
+                for parts in rule.body do
+                    for i=0 to parts.Count do
+                        if (parts.[i] = symbol) then
+                            if (i+1 <= parts.Count && parts.[i+1] = None) then
+                                let firstSetEpsilon =
+                                    first parts.[i+1] grammar
+                                    |> Seq.filter (fun (firstItem) -> firstItem = None)
+                                    |> Set.ofSeq
+                                if (firstSetEpsilon.Count = 0) then
+                                    followSet <- followSet + (follow rule.head grammar)
+                                else
+                                    let firstWithoutEpsilon =
+                                        first parts.[i+1] grammar
+                                        |> Seq.choose Terminal
+                                        |> Set.ofSeq
+                                    followSet <- followSet + (firstWithoutEpsilon)
+        followSet
+
 
     let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
         failwith "TODO: eliminateLeftRecursions"
