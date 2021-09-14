@@ -62,7 +62,18 @@ module Grammar =
         
 
     let follow (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>): Set<Option<'T>> =
-        failwith "TODO: follow"
+        let mutable rulesWhereNonTerminalAppears = Set.empty
+        let mutable output = Set.empty
+        match symbol with 
+        | Terminal t -> Set.empty
+        | NonTerminal n -> 
+            if (n = grammar.Rules[0]) then
+                output <- output.Add(Set.empty.add(Terminal '$'))
+            rulesWhereNonTerminalAppears <- Set.filter (fun (head, body) -> body = n) grammar.Rules
+            for rule in rulesWhereNonTerminalAppears do
+                for production in rule do
+                    None
+            output
 
     let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
         failwith "TODO: eliminateLeftRecursions"
