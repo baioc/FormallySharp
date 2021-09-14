@@ -43,7 +43,7 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
 [<RequireQualifiedAccess>]
 module Grammar =
     /// Finds the FIRST set of a given symbol sequence in a grammar.
-    let rec first (symbols: Symbol<'T, 'N> list) (grammar: Grammar<'T, 'N>) : Set<Option<'T>> =
+    let rec first (symbols: Symbol<'T, 'N> list) (grammar: Grammar<'T, 'N>) : Set<'T option> =
         match symbols with
         // if we get an empty body, it means we are producing epsilon directly
         // or every symbol in the sequence was nullable, so return { epsilon }
@@ -72,7 +72,8 @@ module Grammar =
                     (Set.remove None firstSet)
                     (first rest grammar)
 
-    let follow (symbol: Symbol<'T, 'N>) (grammar: Grammar<'T, 'N>) : Set<Option<'T>> =
+    /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
+    let follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
         failwith "TODO: follow"
         // let mutable rulesWhereNonTerminalAppears = Set.empty
         // let mutable output = Set.empty

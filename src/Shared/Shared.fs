@@ -94,7 +94,8 @@ module Lexer =
     let make spec =
         let dead = ("", Set.empty)
         let makeAutomaton name regexp =
-            Dfa.ofRegexp regexp
+            regexp
+            |> Dfa.ofRegexp '\u0000'
             |> Dfa.map
                 (fun state -> // dead states can be shared
                     if state = Set.empty then dead
