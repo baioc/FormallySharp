@@ -96,7 +96,7 @@ module Grammar =
                                     first (List.singleton nt) grammar
                                     |> Seq.filter (fun (firstItem) -> firstItem = None)
                                     |> Set.ofSeq
-                                if (firstSetEpsilon.Length = 0) then
+                                if (firstSetEpsilon.Count = 0) then
                                     followSet <- followSet + (follow head grammar) 
         followSet
 
