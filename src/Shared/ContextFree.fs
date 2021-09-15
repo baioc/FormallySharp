@@ -75,26 +75,29 @@ module Grammar =
     /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
     let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
         let mutable followSet = Set.empty
-        if (symbol = grammar.Rules.[0].head) then
+        let initialHead, initialBody = Set.toList(grammar.Rules).[0]
+        if (symbol = initialHead) then
             followSet <- followSet.Add(Terminal '$')
         else
-            for rule in grammar.Rules do
-                for parts in rule.body do
-                    for i=0 to parts.Count do
-                        if (parts.[i] = symbol) then
-                            if (i+1 <= parts.Count && parts.[i+1] = None) then
+            for head, body in grammar.Rules do
+                for i=0 to body.Length do
+                    match body.[i] with
+                    | Terminal t -> ()
+                    | NonTerminal nt->
+                        if (nt = symbol) then
+                            if (body.Length <> 0) then
+                                let firstWithoutEpsilon =
+                                    first (List.singleton body.[i+1]) grammar
+                                    |> Seq.choose Terminal
+                                    |> Set.ofSeq
+                                followSet <- followSet + (firstWithoutEpsilon)
+                            else
                                 let firstSetEpsilon =
-                                    first parts.[i+1] grammar
+                                    first (List.singleton nt) grammar
                                     |> Seq.filter (fun (firstItem) -> firstItem = None)
                                     |> Set.ofSeq
-                                if (firstSetEpsilon.Count = 0) then
-                                    followSet <- followSet + (follow rule.head grammar)
-                                else
-                                    let firstWithoutEpsilon =
-                                        first parts.[i+1] grammar
-                                        |> Seq.choose Terminal
-                                        |> Set.ofSeq
-                                    followSet <- followSet + (firstWithoutEpsilon)
+                                if (firstSetEpsilon.Length = 0) then
+                                    followSet <- followSet + (follow head grammar) 
         followSet
 
 
