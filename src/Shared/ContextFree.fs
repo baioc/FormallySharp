@@ -77,7 +77,7 @@ module Grammar =
         let mutable followSet = Set.empty
         let initialHead, initialBody = Set.toList(grammar.Rules).[0]
         if (symbol = initialHead) then
-            followSet <- followSet.Add(Terminal '$')
+            followSet <- followSet.Add(terminator)
         else
             for head, body in grammar.Rules do
                 for i=0 to body.Length do
@@ -85,19 +85,19 @@ module Grammar =
                     | Terminal t -> ()
                     | NonTerminal nt->
                         if (nt = symbol) then
-                            if (body.Length <> 0) then
+                            if (body.Length <> 0 && (i+1) < body.Length) then
                                 let firstWithoutEpsilon =
                                     first (List.singleton body.[i+1]) grammar
-                                    |> Seq.choose Terminal
+                                    |> Seq.choose id 
                                     |> Set.ofSeq
                                 followSet <- followSet + (firstWithoutEpsilon)
                             else
                                 let firstSetEpsilon =
-                                    first (List.singleton nt) grammar
+                                    first (List.singleton body.[i]) grammar
                                     |> Seq.filter (fun (firstItem) -> firstItem = None)
                                     |> Set.ofSeq
                                 if (firstSetEpsilon.Count = 0) then
-                                    followSet <- followSet + (follow head grammar) 
+                                    followSet <- followSet +  (follow head grammar terminator)
         followSet
 
 
