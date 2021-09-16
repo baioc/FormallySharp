@@ -8,7 +8,7 @@ open Shared.Tests
 
 
 let server = testList "Server" [
-    ptestCase "Store an empty project" <| fun _ ->
+    testCase "DB write followed by read" <| fun _ ->
         let storage = Storage()
         let emptyProject =
             { Id = ""
@@ -16,7 +16,7 @@ let server = testList "Server" [
               Syntax = { Initial = ""; Rules = Set.empty } }
         do storage.SaveProject(emptyProject)
         let project = storage.GetProject("")
-        Expect.equal project emptyProject "Write followed by read should be idempotent"
+        Expect.equal project emptyProject "DB write followed by read should be idempotent"
 ]
 
 

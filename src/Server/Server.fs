@@ -8,8 +8,30 @@ open LiteDB
 open LiteDB.FSharp
 open LiteDB.FSharp.Extensions
 
+open Formally.ContextFree
 open Shared
 
+
+// XXX: we need the alternative types for projects that can be stored in LiteDB,
+// see the issue with sets: https://github.com/Zaid-Ajaj/LiteDB.FSharp/issues/65
+type Grammar' =
+    { Initial: Identifier
+      Rules: List<ContextFreeProduction<Identifier, Identifier>> }
+
+type Project' =
+    { Id: Identifier
+      Lexicon: LexicalSpecification
+      Syntax: Grammar' }
+
+let private store (p: Project) : Project' =
+    { Id = p.Id
+      Lexicon = p.Lexicon
+      Syntax = { Initial = p.Syntax.Initial; Rules = Set.toList p.Syntax.Rules } }
+
+let private restore (p: Project') : Project =
+    { Id = p.Id
+      Lexicon = p.Lexicon
+      Syntax = { Initial = p.Syntax.Initial; Rules = Set.ofList p.Syntax.Rules } }
 
 /// Server-side storage. Use with parsimony.
 type Storage() =
@@ -19,14 +41,16 @@ type Storage() =
         let connStr = "Filename=FormallySharp.db;mode=Exclusive"
         new LiteDatabase(connStr, mapper)
 
-    let projects = database.GetCollection<Project> "projects"
+    let projects = database.GetCollection<Project'> "projects"
 
     /// Retrieves a project by its identifier, raising an error when not found.
     member __.GetProject(id) =
         projects.findOne <@ fun project -> project.Id = id @>
+        |> restore
 
     /// Saves a project to the database. NOTE: Always overwrites.
     member __.SaveProject(project: Project) =
+        let project = store project
         match projects.tryFindOne <@ fun p -> p.Id = project.Id @> with
         | None -> projects.Insert(project) |> ignore
         | Some _ -> projects.Update(project) |> ignore
