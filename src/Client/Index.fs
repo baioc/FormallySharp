@@ -64,6 +64,7 @@ let api =
     |> Remoting.buildProxy<FormallySharp>
 
 let init () : Model * Cmd<Msg> =
+    // TODO: clear "empty" project on release
     let emptyProject =
         { Id = ""
           Lexicon = Map.ofSeq [
@@ -165,7 +166,11 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GotError ex ->
         let toastAlert =
+#if DEBUG   // during development, print the specific API call that failed
+            ToastAlert(string ex.Message)
+#else       // on release mode, we have a generic error message for users
             ToastAlert("erro ao efetuar operação")
+#endif
                 .Position(AlertPosition.Top)
                 .ConfirmButton(true)
                 .Timeout(13000)
@@ -287,7 +292,12 @@ let projectSyntactical grammar lexSpec (head: string, body: string) dispatch =
                     prop.style [ style.paddingLeft (length.rem 0) ]
                     prop.children [
                         Bulma.delete [
-                            prop.disabled (grammar.Initial = head)
+                            // we can't remove all initial productions
+                            prop.disabled
+                                (grammar.Initial = head
+                                && grammar.Rules
+                                   |> Set.filter (fst >> (=) grammar.Initial)
+                                   |> Set.count <= 1)
                             prop.onClick
                                 (fun _ ->
                                     { grammar with
@@ -350,9 +360,10 @@ let projectSyntactical grammar lexSpec (head: string, body: string) dispatch =
             prop.disabled (not buttonEnabled)
             prop.onClick
                 (fun _ ->
-                    let rule = Option.get productionHead, Option.get productionBody
+                    let head, body = Option.get productionHead, Option.get productionBody
                     { grammar with
-                          Rules = Set.add rule grammar.Rules }
+                          Initial = if grammar.Initial = "" then head else grammar.Initial
+                          Rules = Set.add (head, body) grammar.Rules }
                     |> ChangeGrammarProductions
                     |> dispatch)
             color.isSuccess
