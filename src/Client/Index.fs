@@ -746,7 +746,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
             ]
         ]
 
-    let viewLexer lexer =
+    let viewLexer (lexer: Lexer) =
         Bulma.tableContainer [
             Bulma.table [
                 table.isFullWidth
