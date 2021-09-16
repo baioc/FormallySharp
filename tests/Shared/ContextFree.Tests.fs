@@ -50,7 +50,7 @@ module ContextFree =
 
         testCase "FOLLOW sets" <| fun _ ->
             let testFollow symbol expected =
-                Expect.equal (Grammar.follow symbol notLL1 '$') expected $"FOLLOW({symbol})"
+                Expect.equal (Grammar.follow symbol notLL1 '$' "S") expected $"FOLLOW({symbol})"
             testFollow "S" (set [ '$' ])
             testFollow "A" (set [ 'a' ])
             testFollow "B" (set [ 'b' ])

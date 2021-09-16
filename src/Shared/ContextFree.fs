@@ -42,6 +42,14 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
 
 [<RequireQualifiedAccess>]
 module Grammar =
+    /// Unite same non terminal productions on a list of ProductionBody
+    let uniteSameNonTerminalProductions (symbol: 'N) (grammar: Grammar<'T, 'N>) : ProductionBody<'T, 'N> list =
+        let mutable listOfProductions = ResizeArray<ProductionBody<'T,'N>>()
+        for head, body in grammar.Rules do
+            if (head = symbol) then
+                listOfProductions.Add(body)
+        List.ofArray (listOfProductions.ToArray())
+
     /// Finds the FIRST set of a given symbol sequence in a grammar.
     let rec first (symbols: Symbol<'T, 'N> list) (grammar: Grammar<'T, 'N>) : Set<'T option> =
         match symbols with
@@ -73,31 +81,40 @@ module Grammar =
                     (first rest grammar)
 
     /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
-    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
+    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) (initialSymbol: 'N) : Set<'T> =
         let mutable followSet = Set.empty
-        let initialHead, initialBody = Set.toList(grammar.Rules).[0]
-        if (symbol = initialHead) then
+        // Se S é o símbolo inicial da gramática, então $ ∈ FOLLOW(S)
+        if (symbol = initialSymbol) then
             followSet <- followSet.Add(terminator)
-        else
-            for head, body in grammar.Rules do
-                for i=0 to body.Length do
-                    match body.[i] with
+
+        for head, body in grammar.Rules do
+            if (body.Length <> 0) then
+                for i=0 to (body.Length - 1) do
+                    let production = body.[i]
+                    match production with
                     | Terminal t -> ()
                     | NonTerminal nt->
                         if (nt = symbol) then
-                            if (body.Length <> 0 && (i+1) < body.Length) then
-                                let firstWithoutEpsilon =
-                                    first (List.singleton body.[i+1]) grammar
-                                    |> Seq.choose id 
-                                    |> Set.ofSeq
-                                followSet <- followSet + (firstWithoutEpsilon)
+                            if ((i+1) < (body.Length - 1)) then
+                                let firstOfNext = first (List.singleton body.[i+1]) grammar
+                                let mutable firstHasEpsilon = false
+                                for value in firstOfNext do
+                                    match value with
+                                    | Some x -> ()
+                                    | None -> firstHasEpsilon <- false
+                                // Se A ::= αBβ e β != ε, então adicione FIRST(β) em FOLLOW(B)
+                                if (not firstHasEpsilon) then
+                                    let firstWithoutEpsilon =
+                                        first (List.singleton body.[i+1]) grammar
+                                        |> Seq.choose id 
+                                        |> Set.ofSeq
+                                    followSet <- followSet + (firstWithoutEpsilon)
+                                else 
+                                    // Se A ::= αBβ, onde ε ∈ FIRST(β), então adicione FOLLOW(A) em FOLLOW(B)
+                                    followSet <- followSet + (follow head grammar terminator initialSymbol)
                             else
-                                let firstSetEpsilon =
-                                    first (List.singleton body.[i]) grammar
-                                    |> Seq.filter (fun (firstItem) -> firstItem = None)
-                                    |> Set.ofSeq
-                                if (firstSetEpsilon.Count = 0) then
-                                    followSet <- followSet +  (follow head grammar terminator)
+                                // Se A ::= αB, então adicione FOLLOW(A) em FOLLOW(B)
+                                followSet <- followSet +  (follow head grammar terminator initialSymbol)
         followSet
 
 
