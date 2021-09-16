@@ -59,22 +59,19 @@ open Formally.Automata
 
 type Stack<'T> = 'T list // top -> [ head ... ] <- bottom
 
+/// These define what happens to the stack on each transition.
 type StackAction<'T> =
-    | Push of Stack<'T>
-    | PopN of uint
     | NoOp
+    | ReplaceTop of List<'T>
 
 module private Stack =
     let tryAction action stack =
         match action with
-        | Push prefix -> List.append prefix stack |> Some
-        | PopN n ->
-            let n = int n
-            if List.length stack >= n then
-                List.splitAt n stack |> snd |> Some
-            else
-                None // stack underflow
         | NoOp -> Some stack
+        | ReplaceTop newTop ->
+            match stack with
+            | [] -> None // stack underflow
+            | top :: stack -> List.append newTop stack |> Some
 
 type DpdaTransition<'State, 'InputSymbol, 'StackSymbol
         when 'State: comparison and 'InputSymbol: comparison and 'StackSymbol: comparison> =
@@ -128,8 +125,8 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
 
     member this.StackAlphabet : Set<'StackSymbol> =
         let symbolsInAction = function
-            | Push symbols -> Set.ofSeq symbols
-            | PopN _ | NoOp -> Set.empty
+            | ReplaceTop symbols -> Set.ofSeq symbols
+            | NoOp -> Set.empty
         Map.toSeq this.Transitions
         |> Seq.map
             (fun ((q, topOfStack), transition) ->
@@ -188,5 +185,6 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
                 else
                     Ok action, next
 
-
-// TODO: generate LL(1) parser
+/// Less parametric DPDA for the common case when input symbols = stack symbols.
+type Dpda<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
+    Dpda<'State, 'Symbol, 'Symbol>

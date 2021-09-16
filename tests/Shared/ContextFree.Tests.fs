@@ -28,14 +28,14 @@ module Dpda =
           Current = "zero", [ Bottom ]
           Transitions = map [
               ("zero", Bottom) |-> [
-                  a => ("push", Push [ a ])
+                  a => ("push", ReplaceTop [ a; Bottom ])
               ]
               ("push", a) |-> [
-                  a => ("push", Push [ a ])
-                  b => ("pop", PopN 1u)
+                  a => ("push", ReplaceTop [ a; a ])
+                  b => ("pop", ReplaceTop [])
               ]
               ("pop", a) |-> [
-                  b => ("pop", PopN 1u)
+                  b => ("pop", ReplaceTop [])
               ]
               ("pop", Bottom) ?-> ("match", NoOp)
           ] }
