@@ -11,11 +11,15 @@ open Formally.Converter
 
 /// Represents a valid string to be used as an identifier for syntax rules.
 ///
-/// FIXME: this is a type alias, so nothing is enforced in construction.
+/// NOTE: this is a simple type alias, so nothing is enforced in construction.
 type Identifier = string
 
 module Identifier =
-    let isValid str = Regex.IsMatch(str, @"^[A-Za-z_]\w*$")
+    /// Regular expression that matches a valid identifier.
+    let regex = @"[A-Za-z_]\w*"
+
+    /// Checks whether the given string is a valid identifier.
+    let isValid str = Regex.IsMatch(str, $"^{regex}$")
 
 [<Extension>]
 module String =
@@ -231,12 +235,15 @@ module Lexer =
     }
 
 
+/// Syntactical spec, where terminals should identify tokens in the lexical spec.
+type Grammar = Grammar<Identifier, Identifier>
+
+
 /// A formal language project.
 type Project =
     { Id: Identifier
       Lexicon: LexicalSpecification
-      Syntax: Grammar<Identifier, Identifier> }
-
+      Syntax: Grammar }
 
 /// Defines the API between our web app and server backend.
 ///
