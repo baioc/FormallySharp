@@ -81,10 +81,10 @@ module Grammar =
                     (first rest grammar)
 
     /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
-    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) (initialSymbol: 'N) : Set<'T> =
+    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
         let mutable followSet = Set.empty
         // Se S é o símbolo inicial da gramática, então $ ∈ FOLLOW(S)
-        if (symbol = initialSymbol) then
+        if (symbol = grammar.Initial) then
             followSet <- followSet.Add(terminator)
 
         for head, body in grammar.Rules do
@@ -111,10 +111,10 @@ module Grammar =
                                     followSet <- followSet + (firstWithoutEpsilon)
                                 else 
                                     // Se A ::= αBβ, onde ε ∈ FIRST(β), então adicione FOLLOW(A) em FOLLOW(B)
-                                    followSet <- followSet + (follow head grammar terminator initialSymbol)
+                                    followSet <- followSet + (follow head grammar terminator)
                             else
                                 // Se A ::= αB, então adicione FOLLOW(A) em FOLLOW(B)
-                                followSet <- followSet +  (follow head grammar terminator initialSymbol)
+                                followSet <- followSet +  (follow head grammar terminator)
         followSet
 
 
