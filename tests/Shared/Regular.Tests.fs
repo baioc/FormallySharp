@@ -154,7 +154,7 @@ module Nfa =
 
     // functional DSL style
     let map s = Map.ofSeq s
-    let (=>) (previous, input) next = (previous, input), next
+    let (=>) a b = a, b
 
     // DFA over {0,1} that accepts even binary numbers with at least one digit
     let even =

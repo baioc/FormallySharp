@@ -19,8 +19,9 @@ module Extensions =
         let exec inputs automaton =
 #endif
             Automaton.trace inputs automaton
-            |> Seq.last
-            |> fun ((q, i), (q', o)) -> q'
+            |> Seq.tryLast
+            |> Option.map (fun ((q, i), (q', o)) -> q')
+            |> Option.defaultValue automaton.View
 
     module Expect =
         /// Runs an automaton over inputs and checks if it ends in the expected state.
@@ -30,7 +31,7 @@ module Extensions =
         let trace automaton inputs expected =
 #endif
                 Expect.equal (Automaton.exec inputs automaton) expected
-                    "Should have reached the expected state"
+                    $"Reached unexpected state by input {inputs}"
 
 
 module Automaton =

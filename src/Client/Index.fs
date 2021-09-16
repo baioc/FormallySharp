@@ -20,23 +20,23 @@ type Phase =
     | Lexical
     | Syntactical
 
-type Model =
-    { // domain-related state, everything else stems from this or is for the UI.
-      // in other words: if this was an online shop, this would be the cart
-      Project: Project // stores project identifier text
+type Model = {
+    // domain-related state, everything else stems from this or is for the UI.
+    // in other words: if this was an online shop, this would be the cart
+    Project: Project // stores project identifier text
 
-      // shared between analysis phases
-      Phase: Phase
-      InputText: string
+    // shared between analysis phases
+    Phase: Phase
+    InputText: string
 
-      // lexing-related state
-      Lexer: Lexer option
-      RegularDefinitionText: string * string * string // inputs: kind, name, regex
-      SymbolTable: Result<TokenInstance, LexicalError> seq
+    // lexing-related state
+    Lexer: Lexer option
+    RegularDefinitionText: string * string * string // inputs: kind, name, regex
+    SymbolTable: Result<TokenInstance, LexicalError> seq
 
-      // parsing-related state
-      GrammarProductionText: string * string // inputs: head, body
-    }
+    // parsing-related state
+    GrammarProductionText: string * string // inputs: head, body
+}
 
 type Msg =
     // project-related messages
