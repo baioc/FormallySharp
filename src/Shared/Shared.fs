@@ -10,6 +10,8 @@ open Formally.Converter
 
 
 /// Represents a valid string to be used as an identifier for syntax rules.
+///
+/// FIXME: this is a type alias, so nothing is enforced in construction.
 type Identifier = string
 
 module Identifier =
