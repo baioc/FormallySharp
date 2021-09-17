@@ -9,6 +9,8 @@ type Symbol<'T, 'N> =
     | NonTerminal of 'N
 
 /// Represents the (possibly empty) body of a single production: `(T + N)*`.
+///
+/// Epsilon productions are represented as the empty list.
 type ProductionBody<'T, 'N> = Symbol<'T, 'N> list
 
 /// Models context-free production rules like `N -> (T + N)*`.
@@ -42,16 +44,14 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
 
 [<RequireQualifiedAccess>]
 module Grammar =
-    /// Unite same non terminal productions on a list of ProductionBody
-    let uniteSameNonTerminalProductions (symbol: 'N) (grammar: Grammar<'T, 'N>) : ProductionBody<'T, 'N> list =
-        let mutable listOfProductions = ResizeArray<ProductionBody<'T,'N>>()
-        for head, body in grammar.Rules do
-            if (head = symbol) then
-                listOfProductions.Add(body)
-        List.ofArray (listOfProductions.ToArray())
+    /// Finds the subset of derivations with a specific symbol at its head.
+    let derivationsFrom symbol grammar =
+        Set.filter (fun (head, body) -> head = symbol) grammar.Rules
 
-    /// Finds the FIRST set of a given symbol sequence in a grammar.
-    let rec first (symbols: Symbol<'T, 'N> list) (grammar: Grammar<'T, 'N>) : Set<'T option> =
+    /// Computes the FIRST set of a given symbol sequence in a grammar.
+    ///
+    /// Epsilon is a terminal symbol represented by `None`.
+    let rec first symbols grammar =
         match symbols with
         // if we get an empty body, it means we are producing epsilon directly
         // or every symbol in the sequence was nullable, so return { epsilon }
@@ -62,8 +62,8 @@ module Grammar =
         // (but with an altered grammar to avoid going infinite on cycles)
         | NonTerminal n :: rest ->
             let firstSet =
-                grammar.Rules
-                |> Seq.filter (fun (head, body) -> head = n)
+                grammar
+                |> derivationsFrom n
                 |> Seq.map
                     (fun (head, body) ->
                         let grammar =
@@ -80,43 +80,58 @@ module Grammar =
                     (Set.remove None firstSet)
                     (first rest grammar)
 
-    /// Finds the FOLLOW set of a non-terminal symbol in a given grammar.
-    let rec follow (symbol: 'N) (grammar: Grammar<'T, 'N>) (terminator: 'T) : Set<'T> =
-        let mutable followSet = Set.empty
-        // Se S é o símbolo inicial da gramática, então $ ∈ FOLLOW(S)
-        if (symbol = grammar.Initial) then
-            followSet <- followSet.Add(terminator)
+    /// Computes the FOLLOW set of every non-terminal symbol in the grammar.
+    let followSets endmarker (grammar: Grammar<_, _>) =
+        // initially, FOLLOW(<startSymbol>) = { endmarker }
+        let mutable follows = System.Collections.Generic.Dictionary()
+        for symbol in grammar.NonTerminals do
+            if symbol = grammar.Initial then
+                follows.[symbol] <- Set.singleton endmarker
+            else
+                follows.[symbol] <- Set.empty
 
-        for head, body in grammar.Rules do
-            if (body.Length <> 0) then
-                for i=0 to (body.Length - 1) do
-                    let production = body.[i]
-                    match production with
-                    | Terminal t -> ()
-                    | NonTerminal nt->
-                        if (nt = symbol) then
-                            if ((i+1) < (body.Length - 1)) then
-                                let firstOfNext = first (List.singleton body.[i+1]) grammar
-                                let mutable firstHasEpsilon = false
-                                for value in firstOfNext do
-                                    match value with
-                                    | Some x -> ()
-                                    | None -> firstHasEpsilon <- false
-                                // Se A ::= αBβ e β != ε, então adicione FIRST(β) em FOLLOW(B)
-                                if (not firstHasEpsilon) then
-                                    let firstWithoutEpsilon =
-                                        first (List.singleton body.[i+1]) grammar
-                                        |> Seq.choose id 
-                                        |> Set.ofSeq
-                                    followSet <- followSet + (firstWithoutEpsilon)
-                                else 
-                                    // Se A ::= αBβ, onde ε ∈ FIRST(β), então adicione FOLLOW(A) em FOLLOW(B)
-                                    followSet <- followSet + (follow head grammar terminator)
-                            else
-                                // Se A ::= αB, então adicione FOLLOW(A) em FOLLOW(B)
-                                followSet <- followSet +  (follow head grammar terminator)
-        followSet
+        // for every non-terminal <A> followed by some non-empty sequence [B]
+        // in a production body, add FIRST(B)/{epsilon} to FOLLOW(A)
+        let rec doFollowsInBody body =
+            match body with
+            | [] -> ()
+            | Terminal _ :: rest -> doFollowsInBody rest
+            | NonTerminal a :: b ->
+                let firstB = first b grammar |> Seq.choose id |> Set.ofSeq
+                do follows.[a] <- Set.union follows.[a] firstB
+                doFollowsInBody b
 
+        for _, body in grammar.Rules do
+            doFollowsInBody body
+
+        // for every rule headed by <A> and tailed by a non-terminal <B>
+        // (that is, <A> ::= ... <B> [X] and epsilon in FIRST[X]), we want to
+        // add everything in FOLLOW(A) to FOLLOW(B). repeat until convergence
+        let rec nonTerminalTails body tails =
+            match body with
+            | [] -> tails
+            | Terminal _ :: rest -> nonTerminalTails rest tails
+            | NonTerminal b :: x ->
+                let firstX = first x grammar
+                if Set.contains None firstX then
+                    nonTerminalTails x (Set.add b tails)
+                else
+                    nonTerminalTails x tails
+
+        let mutable converged = false
+        while not converged do
+            converged <- true
+            for a, production in grammar.Rules do
+                for b in nonTerminalTails production Set.empty do
+                    let additions = Set.difference follows.[a] follows.[b]
+                    if not (Set.isEmpty additions) then
+                        follows.[b] <- Set.union follows.[b] additions
+                        converged <- false
+
+        // convert mutable to immutable mapping
+        follows
+        |> Seq.map (fun entry -> entry.Key, entry.Value)
+        |> Map.ofSeq
 
     let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
         failwith "TODO: eliminateLeftRecursions"
