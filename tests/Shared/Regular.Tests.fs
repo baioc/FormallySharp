@@ -34,59 +34,42 @@ module Regexp =
             let a = randomRegexps()
             let b = randomRegexps()
             let c = randomRegexps()
-            Seq.zip3 a b c
-            |> Seq.iter
-                (fun (a, b, c) ->
-                    Expect.equal ((a + b) + c) (a + (b + c))
-                        "For all a, b and c, ((a + b) + c) should be equal to (a + (b + c))")
+            for a, b, c in Seq.zip3 a b c do
+                Expect.equal ((a + b) + c) (a + (b + c))
+                    "For all a, b and c, ((a + b) + c) should be equal to (a + (b + c))"
 
         testCase "Zero is the identity of (+)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (Regexp.Zero + r) r "For all r, (0 + r) should be equal to (r)"
-                    Expect.equal (r + Regexp.Zero) r "For all r, (r + 0) should be equal to (r)")
+            for r in randomRegexps() do
+                Expect.equal (Regexp.Zero + r) r "For all r, (0 + r) should be equal to (r)"
+                Expect.equal (r + Regexp.Zero) r "For all r, (r + 0) should be equal to (r)"
 
         testCase "Commutativity of (+)" <| fun _ ->
             let a = randomRegexps()
             let b = randomRegexps()
-            Seq.zip a b
-            |> Seq.iter
-                (fun (a, b) ->
-                    Expect.equal (a + b) (b + a)
-                        "For all a and b, (a + b) should be equal to (b + a)")
+            for a, b in Seq.zip a b do
+                Expect.equal (a + b) (b + a) "For all a and b, (a + b) should be equal to (b + a)"
 
         testCase "Idempotency of (+)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (r + r) r "For all r, (r + r) should be equal to (r)")
+            for r in randomRegexps() do
+                Expect.equal (r + r) r "For all r, (r + r) should be equal to (r)"
 
         testCase "Associativity of (*)" <| fun _ ->
             let a = randomRegexps()
             let b = randomRegexps()
             let c = randomRegexps()
-            Seq.zip3 a b c
-            |> Seq.iter
-                (fun (a, b, c) ->
-                    Expect.equal ((a * b) * c) (a * (b * c))
-                        "For all a, b and c, ((a * b) * c) should be equal to (a * (b * c))")
+            for a, b, c in Seq.zip3 a b c do
+                Expect.equal ((a * b) * c) (a * (b * c))
+                    "For all a, b and c, ((a * b) * c) should be equal to (a * (b * c))"
 
         testCase "One is the identity of (*)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (Regexp.One * r) r "For all r, (1 * r) should be equal to (r)"
-                    Expect.equal (r * Regexp.One) r "For all r, (r * 1) should be equal to (r)")
+            for r in randomRegexps() do
+                Expect.equal (Regexp.One * r) r "For all r, (1 * r) should be equal to (r)"
+                Expect.equal (r * Regexp.One) r "For all r, (r * 1) should be equal to (r)"
 
         testCase "Zero annihilates by (*)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (Regexp.Zero * r) Regexp.Zero
-                        "For all r, (0 * r) should be equal to (0)"
-                    Expect.equal (r * Regexp.Zero) Regexp.Zero
-                        "For all r, (r * 0) should be equal to (0)")
+            for r in randomRegexps() do
+                Expect.equal (Regexp.Zero * r) Regexp.Zero "For all r, (0 * r) should be equal to (0)"
+                Expect.equal (r * Regexp.Zero) Regexp.Zero "For all r, (r * 0) should be equal to (0)"
 
         testCase "The Kleene closure of Zero is One" <| fun _ ->
             Expect.equal (!* Regexp.Zero) Regexp.One "(!* 0) should be equal to (1)"
@@ -95,11 +78,9 @@ module Regexp =
             Expect.equal (!* Regexp.One) Regexp.One "(!* 1) should be equal to (1)"
 
         testCase "Fixpoint property of the Kleene closure" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (!* (!* r)) (!*r) "For all r, (!* (!* r)) should be equal to (!*r)"
-                    Expect.equal (!* (!? r)) (!*r) "For all r, (!* (!? r) should be equal to (!*r)")
+            for r in randomRegexps() do
+                Expect.equal (!* (!* r)) (!*r) "For all r, (!* (!* r)) should be equal to (!*r)"
+                Expect.equal (!* (!? r)) (!*r) "For all r, (!* (!? r) should be equal to (!*r)"
 
         testCase "Build regexp from char range" <| fun _ ->
             let a = Regexp.singleton 'a'
@@ -111,40 +92,31 @@ module Regexp =
             Expect.equal (Regexp.ofSet alpha) alphaGroup "['a' .. 'z'] should be equal to /a-z/"
 
         testCase "Optional operator (!?)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (!?r) (Regexp.empty + r)
-                        "For all r, (!?r) should be equal to (1 + r)")
+            for r in randomRegexps() do
+                Expect.equal (!?r) (Regexp.empty + r) "For all r, (!?r) should be equal to (1 + r)"
 
         testCase "Positive closure operator (!+)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (!+r) (r * !*r) "For all r, (!+r) should be equal to (r * !*r)")
+            for r in randomRegexps() do
+                Expect.equal (!+r) (r * !*r) "For all r, (!+r) should be equal to (r * !*r)"
 
         testCase "Repetition operator (**)" <| fun _ ->
-            randomRegexps()
-            |> Seq.iter
-                (fun r ->
-                    Expect.equal (r ** 0) Regexp.One "For all r, (r**0) should be equal to (1)"
-                    Expect.equal (r ** 1) r "For all r, (r**1) should be equal to (r)"
-                    Expect.equal (r ** 2) (r * r) "For all r, (r**2) should be equal to (r * r)")
+            for r in randomRegexps() do
+                Expect.equal (r ** 0) Regexp.One "For all r, (r**0) should be equal to (1)"
+                Expect.equal (r ** 1) r "For all r, (r**1) should be equal to (r)"
+                Expect.equal (r ** 2) (r * r) "For all r, (r**2) should be equal to (r * r)"
 
         testCase "Non-algebraic names" <| fun _ ->
             Expect.equal Regexp.none Regexp.Zero "none should be an alias of Zero"
             Expect.equal Regexp.empty Regexp.One "empty should be an alias of One"
             let a = randomRegexps()
             let b = randomRegexps()
-            Seq.zip a b
-            |> Seq.iter
-                (fun (a, b) ->
-                    Expect.equal (Regexp.union a b) (a + b) "union should be an alias of (+)"
-                    Expect.equal (Regexp.append a b) (a * b) "append should be an alias of (*)"
-                    Expect.equal (Regexp.star a) (!* a) "star should be an alias of (!*)"
-                    Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
-                    Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
-                    Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)")
+            for a, b in Seq.zip a b do
+                Expect.equal (Regexp.union a b) (a + b) "union should be an alias of (+)"
+                Expect.equal (Regexp.append a b) (a * b) "append should be an alias of (*)"
+                Expect.equal (Regexp.star a) (!* a) "star should be an alias of (!*)"
+                Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
+                Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
+                Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)"
     ]
 
 

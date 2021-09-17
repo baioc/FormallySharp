@@ -54,18 +54,18 @@ module Dpda =
                 "Should have inferred stack alphabet"
 
         testCase "DPDA execution" <| fun _ ->
-            [ ""         => true
-              "b"        => false
-              "ab"       => true
-              "aabbb"    => false
-              "aaabbb"   => true
-              "aaabbabb" => false ]
-            |> Seq.iter
-                (fun (case, expected) ->
-                    let actual =
-                        Automaton.exec case pairs
-                        ||> fun state stack -> Set.contains state pairs.Accepting
-                    Expect.equal actual expected $"Wrong output for input string '{case}'")
+            let tests =
+                [ ""         => true
+                  "b"        => false
+                  "ab"       => true
+                  "aabbb"    => false
+                  "aaabbb"   => true
+                  "aaabbabb" => false ]
+            for case, expected in tests do
+                let actual =
+                    Automaton.exec case pairs
+                    ||> fun state stack -> Set.contains state pairs.Accepting
+                Expect.equal actual expected $"Wrong output for input string '{case}'"
 
         testCase "Implicit dead transitions" <| fun _ ->
             let message = "Should have transitioned to dead state"
