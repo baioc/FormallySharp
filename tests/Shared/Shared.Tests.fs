@@ -23,6 +23,7 @@ module Shared =
         Regexp.tests
         Nfa.tests
         Converter.tests
+        Grammar.tests
         Dpda.tests
 
         // shared application-specific logic

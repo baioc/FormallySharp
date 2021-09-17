@@ -347,8 +347,7 @@ module Dfa =
     let ofNfa = Nfa.toDfa
 
     /// Converts a Regexp directly to a DFA through Aho's algorithm.
-    let ofRegexp regexp =
-        let terminator = Unchecked.defaultof<_>
+    let ofRegexp terminator regexp =
         let mutable followposTable = System.Collections.Generic.Dictionary()
         let mutable correspondenceTable = System.Collections.Generic.Dictionary()
         let mutable inputSymbols = Set.empty
