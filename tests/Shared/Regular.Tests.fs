@@ -334,5 +334,6 @@ module Nfa =
             let a = Regexp.singleton 'a'
             let b = Regexp.singleton 'b'
             let regexp = (!* (a + b)) * a * b * b
-            Expect.equal (Dfa.ofRegexp regexp) expected "Should have been correctly converted"
+            Expect.equal (Dfa.ofRegexp '\u0000' regexp) expected
+                "Should have been correctly converted"
     ]
