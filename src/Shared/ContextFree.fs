@@ -134,10 +134,10 @@ module Grammar =
         |> Map.ofSeq
 
     let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
-        failwith "TODO: eliminateLeftRecursions"
+        failwith "TODO: Grammar.eliminateLeftRecursions"
 
     let leftFactor (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
-        failwith "TODO: leftFactor"
+        failwith "TODO: Grammar.leftFactor"
 
 
 // TODO: deterministic pushdown automaton (DPDA)

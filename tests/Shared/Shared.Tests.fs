@@ -23,7 +23,7 @@ module Shared =
         Regexp.tests
         Nfa.tests
         Converter.tests
-        ContextFree.tests
+        Grammar.tests
 
         // shared application-specific logic
         testList "Business Logic" [
