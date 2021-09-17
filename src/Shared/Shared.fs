@@ -10,10 +10,16 @@ open Formally.Converter
 
 
 /// Represents a valid string to be used as an identifier for syntax rules.
+///
+/// NOTE: this is a simple type alias, so nothing is enforced in construction.
 type Identifier = string
 
 module Identifier =
-    let isValid str = Regex.IsMatch(str, @"^[A-Za-z_]\w*$")
+    /// Regular expression that matches a valid identifier.
+    let regex = @"[A-Za-z_]\w*"
+
+    /// Checks whether the given string is a valid identifier.
+    let isValid str = Regex.IsMatch(str, $"^{regex}$")
 
 [<Extension>]
 module String =
@@ -90,7 +96,7 @@ type LexicalError =
 
 /// Functions for creating and manipulating lexers.
 module Lexer =
-    /// Builds a Lexer with a clean state according to the given specification.
+    /// Builds a new Lexer according to the given lexical specification.
     let make spec =
         let dead = ("", Set.empty)
         let makeAutomaton name regexp =
@@ -230,17 +236,39 @@ module Lexer =
     }
 
 
+/// Syntactical spec, where terminals are assumed to identify tokens.
+type Grammar = Grammar<Identifier, Identifier>
+type Symbol = Symbol<Identifier, Identifier>
+
+/// Due to multiple stack actions in a single transition, we only need 3 states.
+type LL1State = Dead | Parsing | Accept
+
+/// Table-based LL(1) parser and its dynamic state.
+type Parser =
+    { Automaton: Dpda<LL1State, Identifier, Symbol>
+      Initial: LL1State * Stack<Symbol> }
+
+/// Functions for creating and manipulating LL(1) parsers.
+module Parser =
+    /// Builds a new Parser according to the given syntactical specification.
+    let make grammar =
+        failwith "TODO: Parser.make"
+
+    /// Lazily compute a sequence of derivations based on a stream of input tokens.
+    let parse parser tokens =
+        failwith "TODO: Parser.parse"
+
+
 /// A formal language project.
 type Project =
     { Id: Identifier
       Lexicon: LexicalSpecification
-      Syntax: Grammar<Identifier, Identifier> }
-
+      Syntax: Grammar }
 
 /// Defines the API between our web app and server backend.
 ///
 /// NOTE: in order to get automatic (de)serialization to and from JSON through
-/// Fable.Remoting, every type that is transmitted needs to be *fully* public.
+/// Fable.Remoting, everything transmitted needs to be a (public) value type.
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
       saveProject: Project -> Async<unit>

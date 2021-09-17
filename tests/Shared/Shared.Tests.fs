@@ -24,6 +24,7 @@ module Shared =
         Nfa.tests
         Converter.tests
         Grammar.tests
+        Dpda.tests
 
         // shared application-specific logic
         testList "Business Logic" [
