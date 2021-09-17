@@ -1,7 +1,8 @@
 # Formally#
 
+![GitHub release (semver)](https://img.shields.io/github/v/release/baioc/FormallySharp)
 ![GitHub top language](https://img.shields.io/github/languages/top/baioc/FormallySharp?color=%2330b9db)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/w/baioc/FormallySharp)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/baioc/FormallySharp?label=commits)
 
 Formally# is an online formal language designer.
 **Check it out at [www.formallysharp.codes](http://www.formallysharp.codes)**
@@ -29,7 +30,7 @@ You'll need to install the following pre-requisites in order to build, test and 
 * [ASP.NET Core Runtime](https://dotnet.microsoft.com/apps/aspnet)
 * [Node LTS](https://nodejs.org/en/download/), including NPM
 
-Before running the project **for the first time**, you must also restore dotnet project-local tools:
+Before running the project for the first time (**and after updates**), you must also restore local dotnet tools:
 
 ```sh
 $ dotnet tool restore

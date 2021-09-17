@@ -270,6 +270,6 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
                 else
                     Ok action, next
 
-/// Less parametric DPDA for the common case when input symbols = stack symbols.
+/// Less parametric DPDA for the case when stack symbols <= input symbols.
 type Dpda<'State, 'Symbol when 'State: comparison and 'Symbol: comparison> =
     Dpda<'State, 'Symbol, 'Symbol>

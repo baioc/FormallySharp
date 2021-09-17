@@ -958,14 +958,20 @@ let main model dispatch =
             ]
         ]
 
-    Html.div [
-        Bulma.section [
-            prop.style [ style.paddingTop (length.rem 0) ]
-            prop.children [projectInterface ]
-        ]
-        Bulma.section [
-            prop.style [ style.paddingTop (length.rem 0) ]
-            prop.children [recognitionInterface ]
+    Bulma.columns [
+        columns.isMultiline
+        columns.isCentered
+        prop.children [
+            Bulma.column [
+                column.isFull
+                column.isHalfWidescreen
+                prop.children [ projectInterface ]
+            ]
+            Bulma.column [
+                column.isFull
+                column.isHalfWidescreen
+                prop.children [ recognitionInterface ]
+            ]
         ]
     ]
 
