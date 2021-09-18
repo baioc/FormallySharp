@@ -19,6 +19,8 @@ module Shared =
     open Formally.Converter.Tests
     open Formally.ContextFree.Tests
 
+    let (:=) head body = head, body
+
     let tests = testList "Shared" [
         // internal libraries
         Automaton.tests
@@ -71,8 +73,6 @@ module Shared =
                     "Should respect separator and not backtrack on error"
 
             testCase "LL(1) parser compilation and execution" <| fun _ ->
-                let (:=) head body = head, body
-
                 let grammar =
                     { Initial = "E"
                       Rules = set [
@@ -115,7 +115,7 @@ module Shared =
                 Expect.equal firsts expectedFirsts "First sets"
                 Expect.equal (Grammar.followSets grammar "$") expectedFollows "Follow sets"
 
-                match Parser.tryMake grammar with
+                match Parser.make grammar with
                 | Error table ->
                     failwithf "Should have compiled the LL(1) grammar %A" table
                 | Ok parser ->
@@ -131,7 +131,21 @@ module Shared =
                         let actual = Parser.accepts parser case
                         Expect.equal actual expected $"Wrong output for input stream {case}"
 
-            ptestCase "Parser LL(1) checking" <| fun _ ->
-                failwith "TODO: test compilation of a non-LL1 grammar"
+            testCase "LL(1) grammar verification" <| fun _ ->
+                let notLLK =
+                    { Initial = "S"
+                      Rules = set [
+                          // S -> A | B
+                          "S" := [ NonTerminal "A"]
+                          "S" := [ NonTerminal "B" ]
+                          // A -> a A b | ε
+                          "A" := [ Terminal "a"; NonTerminal "A"; Terminal "b" ]
+                          "A" := []
+                          // B -> a B b b | ε
+                          "B" := [ Terminal "a"; NonTerminal "B"; Terminal "b"; Terminal "b" ]
+                          "B" := []
+                      ] }
+                let ll1 = match Parser.make notLLK with Error _ -> false | Ok _ -> true
+                Expect.equal ll1 false "This grammar is not LL(k)"
         ]
     ]

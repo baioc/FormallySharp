@@ -281,7 +281,7 @@ module Parser =
     /// <returns>
     /// Either a ready-to-use `Parser` or a parsing table with LL(1) conflicts.
     /// </returns>
-    let tryMake grammar =
+    let make grammar =
         let follows = Grammar.followSets grammar Endmarker
 
         // finds all the entries in the table to contain a given production rule
