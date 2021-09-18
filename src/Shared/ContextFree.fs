@@ -44,11 +44,11 @@ type Grammar<'Terminal, 'NonTerminal when 'Terminal: comparison and 'NonTerminal
 
 [<RequireQualifiedAccess>]
 module Grammar =
-    /// Finds the subset of derivations with a specific symbol at its head.
-    let derivationsFrom symbol grammar =
+    /// Finds the DIRECT derivations with a specific symbol at its head.
+    let derivationsOf symbol grammar =
         Set.filter (fun (head, body) -> head = symbol) grammar.Rules
 
-    /// Computes the FIRST set of a given symbol sequence in a grammar.
+    /// Computes the FIRST-set of a given symbol sequence in a grammar.
     ///
     /// Epsilon is a terminal symbol represented by `None`.
     let rec first symbols grammar =
@@ -62,8 +62,7 @@ module Grammar =
         // (but with an altered grammar to avoid going infinite on cycles)
         | NonTerminal n :: rest ->
             let firstSet =
-                grammar
-                |> derivationsFrom n
+                derivationsOf n grammar
                 |> Seq.map
                     (fun (head, body) ->
                         let grammar =
@@ -80,8 +79,8 @@ module Grammar =
                     (Set.remove None firstSet)
                     (first rest grammar)
 
-    /// Computes the FOLLOW set of every non-terminal symbol in the grammar.
-    let followSets endmarker (grammar: Grammar<_, _>) =
+    /// Computes the FOLLOW-set of every non-terminal symbol in the grammar.
+    let followSets (grammar: Grammar<_, _>) endmarker =
         // initially, FOLLOW(<startSymbol>) = { endmarker }
         let mutable follows = System.Collections.Generic.Dictionary()
         for symbol in grammar.NonTerminals do
@@ -161,7 +160,7 @@ module private Stack =
 type DpdaTransition<'State, 'InputSymbol, 'StackSymbol
         when 'State: comparison and 'InputSymbol: comparison and 'StackSymbol: comparison> =
     | EpsilonTransition of 'State * StackAction<'StackSymbol>
-    | InputConsumingTransition of Map<'InputSymbol, ('State * StackAction<'StackSymbol>)>
+    | InputConsumingTransitions of Map<'InputSymbol, ('State * StackAction<'StackSymbol>)>
 
 /// This type is defined such that building a non-deterministic PDA is impossible.
 type private DpdaTransitionTable<'State, 'InputSymbol, 'StackSymbol
@@ -186,7 +185,7 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
             (fun ((q, topOfStack), transition) ->
                 match transition with
                 | EpsilonTransition (q', action) -> set [ q; q' ]
-                | InputConsumingTransition options ->
+                | InputConsumingTransitions options ->
                     Map.toSeq options
                     |> Seq.map (fun (input, (q', action)) -> q')
                     |> Set.ofSeq
@@ -202,7 +201,7 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
             (fun (_, transition) ->
                 match transition with
                 | EpsilonTransition _ -> Set.empty
-                | InputConsumingTransition options ->
+                | InputConsumingTransitions options ->
                     Map.toSeq options
                     |> Seq.map (fun (input, action) -> input)
                     |> Set.ofSeq)
@@ -219,7 +218,7 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
                 | EpsilonTransition (q', action) ->
                     symbolsInAction action
                     |> Set.add topOfStack
-                | InputConsumingTransition options ->
+                | InputConsumingTransitions options ->
                     Map.toSeq options
                     |> Seq.map (fun (input, (q', action)) -> symbolsInAction action)
                     |> Set.unionMany
@@ -253,7 +252,7 @@ type Dpda<'State, 'InputSymbol, 'StackSymbol
                     | None -> this.Dead, stack, Ok NoOp
                     | Some (EpsilonTransition (nextState, action)) ->
                         tryTransition stack (nextState, action)
-                    | Some (InputConsumingTransition options) ->
+                    | Some (InputConsumingTransitions options) ->
                         match Map.tryFind input options with
                         | None -> this.Dead, stack, Ok NoOp
                         | Some (nextState, action) ->

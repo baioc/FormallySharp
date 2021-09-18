@@ -60,6 +60,7 @@ let storage = Storage()
 
 let api =
     { generateLexer = fun spec -> async { return Lexer.make spec }
+      generateParser = fun grammar -> async { return Parser.make grammar }
       saveProject = fun project -> async { return storage.SaveProject(project) }
       loadProject = fun id -> async { return storage.GetProject(id) } }
 

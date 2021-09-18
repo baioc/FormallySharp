@@ -31,10 +31,12 @@ type Model = {
 
     // lexing-related state
     Lexer: Lexer option
+    SymbolTable: Result<TokenInstance, LexicalError> list
     RegularDefinitionText: string * string * string // inputs: kind, name, regex
-    SymbolTable: Result<TokenInstance, LexicalError> seq
 
     // parsing-related state
+    Parser: Parser option
+    AnalysisTable: SyntacticalAnalysisTable
     GrammarProductionText: string * string // inputs: head, body
 }
 
@@ -57,6 +59,8 @@ type Msg =
     // context-free gramamr messages
     | SetGrammarProductionText of string * string
     | ChangeGrammarProductions of Grammar
+    | GenerateParser of Grammar
+    | GeneratedParser of Result<Parser, SyntacticalAnalysisTable>
 
 let api =
     Remoting.createApi ()
@@ -64,35 +68,20 @@ let api =
     |> Remoting.buildProxy<FormallySharp>
 
 let init () : Model * Cmd<Msg> =
-    // TODO: clear "empty" project on release
     let emptyProject =
         { Id = ""
-          Lexicon = Map.ofSeq [
-              "EQUALS", TokenClass(UserRegexp(@"=", Regexp.singleton '='), 8)
-              "BINARY_OP", TokenClass(UserRegexp(@"[+-*/^]", Regexp.ofSet "+-*/^"), 8)
-              "IDENTIFIER", TokenClass(UserRegexp(@"[a-zA-Z_]+", Regexp.ofSet ([ 'a' .. 'z' ] @ [ 'A' .. 'Z' ] @ [ '_' ]) |> Regexp.many), 6)
-              "LET", TokenClass(UserRegexp(@"let", Regexp.ofSeq "let"), 9)
-              "WHITESPACE", Separator <| UserRegexp(@"\s", Regexp.ofSet " \t\n")
-              "NUMBER", TokenClass(UserRegexp(@"[0-9]+", Regexp.ofSet [ '0' .. '9' ] |> Regexp.many), 5)
-              "SEMICOLON", TokenClass(UserRegexp(@";", Regexp.singleton ';'), 7)
-          ]
-          Syntax =
-              { Initial = "POLY"
-                Rules = set [
-                    "POLY", [ Terminal "LET"; Terminal "IDENTIFIER"; Terminal "EQUALS"; NonTerminal "EXPR"; Terminal "SEMICOLON" ]
-                    "POLY", []
-                    "EXPR", [ NonTerminal "NUMBER" ]
-                    "EXPR", [ NonTerminal "IDENTIFIER" ]
-                    "EXPR", [ NonTerminal "EXPR"; Terminal "BINARY_OP"; NonTerminal "EXPR" ]
-                ] } }
+          Lexicon = Map.empty
+          Syntax = { Initial = ""; Rules = Set.empty } }
 
     let model =
         { Project = emptyProject
           Phase = Lexical
           InputText = ""
           Lexer = None
-          RegularDefinitionText = "token", "", ""
           SymbolTable = []
+          RegularDefinitionText = "token", "", ""
+          Parser = None
+          AnalysisTable = Map.empty
           GrammarProductionText = "", "" }
 
     model, Cmd.none
@@ -149,7 +138,13 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .Timeout(5000)
                 .Type(AlertType.Success)
 
-        { model with Project = project },
+        // when loading a new project, we invalidate our analyzers
+        { model with
+              Lexer = None
+              SymbolTable = []
+              Parser = None
+              AnalysisTable = Map.empty
+              Project = project },
         SweetAlert.Run(toastAlert)
 
     | SetPhase phase ->
@@ -161,7 +156,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
               SymbolTable =
                   match model.Lexer with
                   | None -> model.SymbolTable
-                  | Some lexer -> Lexer.tokenize lexer text },
+                  | Some lexer -> Lexer.tokenize lexer text |> List.ofSeq },
         Cmd.none
 
     | GotError ex ->
@@ -212,7 +207,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         { model with
               Lexer = Some lexer
-              SymbolTable = Lexer.tokenize lexer model.InputText },
+              Parser = None // invalidate parser
+              SymbolTable = Lexer.tokenize lexer model.InputText |> List.ofSeq },
         SweetAlert.Run(toastAlert)
 
     | SetGrammarProductionText (head, body) ->
@@ -225,8 +221,62 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
               Project = { model.Project with Syntax = syntax } },
         Cmd.none
 
+    | GenerateParser grammar ->
+        let toastAlert =
+            ToastAlert("gerando analisador sintático...")
+                .Position(AlertPosition.Center)
+                .ConfirmButton(false)
+                .Type(AlertType.Info)
 
-let projectSyntactical grammar lexSpec (head: string, body: string) dispatch =
+        model,
+        Cmd.batch [
+            SweetAlert.Run(toastAlert)
+            Cmd.OfAsync.either api.generateParser grammar GeneratedParser GotError
+        ]
+
+    | GeneratedParser result ->
+        match result with
+        | Error table ->
+            { model with Parser = None; AnalysisTable = table },
+            ToastAlert("a gramática não é LL(1)")
+                .Position(AlertPosition.Top)
+                .ConfirmButton(true)
+                .Timeout(13000)
+                .Type(AlertType.Error)
+            |> SweetAlert.Run
+
+        | Ok parser ->
+            let table =
+                Map.toSeq parser.Automaton.Transitions
+                |> Seq.map
+                    (fun ((state, topOfStack), transitions) ->
+                        match topOfStack, transitions with
+                        | Terminal _, _ | _, EpsilonTransition _ -> Set.empty
+                        | NonTerminal topOfStack, InputConsumingTransitions transitions ->
+                            Map.toSeq transitions
+                            |> Seq.choose
+                                (fun (lookahead, (nextState, action)) ->
+                                    match action with
+                                    | NoOp -> None
+                                    | ReplaceTop production ->
+                                        Some ((topOfStack, lookahead), Set.singleton production)
+                                )
+                            |> Set.ofSeq)
+                |> Set.unionMany
+                |> Map.ofSeq
+
+            { model with
+                  Parser = Some parser
+                  AnalysisTable = table },
+            ToastAlert("analisador sintático gerado")
+                .Position(AlertPosition.Center)
+                .ConfirmButton(true)
+                .Timeout(3000)
+                .Type(AlertType.Success)
+            |> SweetAlert.Run
+
+
+let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: string) dispatch =
     let sprintSymbol =
         function
         | Terminal s -> s
@@ -311,128 +361,211 @@ let projectSyntactical grammar lexSpec (head: string, body: string) dispatch =
         ]
 
     let nonTerminals = grammar.NonTerminals
-    let nonTerminalRegex = sprintf "^<%s>$" Identifier.regex
 
-    let productionHead =
-        let head = head.Trim()
-        if Regex.IsMatch(head, nonTerminalRegex) then
-            Some (head.Substring(1, head.Length - 2))
-        else
-            None
+    let viewSpec =
+        let nonTerminalRegex = sprintf "^<%s>$" Identifier.regex
 
-    let productionBody =
-        let body = body.Trim()
-        if body = "&" then
-            Some []
-        else
-            let parts =
-                Regex.Split(body, @"\s+")
-                |> Seq.map
-                    (fun symbol ->
-                        // a terminal symbol should refer to a token in the lexical spec
-                        // FIXME: removing a token doesn't invalidate grammar rules
-                        match Map.tryFind symbol lexSpec with
-                        | Some (TokenClass _) -> Some (Terminal symbol)
-                        // non-terminals must already exist or refer to themselves
-                        // FIXME: removing a non-terminal doesn't invalidate others
-                        | _ ->
-                            if not <| Regex.IsMatch(symbol, nonTerminalRegex) then
-                                None
-                            else
-                                let symbol = symbol.Substring(1, symbol.Length - 2)
-                                if Set.contains symbol nonTerminals
-                                   || (Option.isSome productionHead && symbol = Option.get productionHead) then
-                                    Some (NonTerminal symbol)
+        let productionHead =
+            let head = head.Trim()
+            if Regex.IsMatch(head, nonTerminalRegex) then
+                Some (head.Substring(1, head.Length - 2))
+            else
+                None
+
+        let productionBody =
+            let body = body.Trim()
+            if body = "&" then
+                Some []
+            else
+                let parts =
+                    Regex.Split(body, @"\s+")
+                    |> Seq.map
+                        (fun symbol ->
+                            // a terminal symbol should refer to a token in the lexical spec
+                            // FIXME: removing a token doesn't invalidate grammar rules
+                            match Map.tryFind symbol lexSpec with
+                            | Some (TokenClass _) -> Some (Terminal symbol)
+                            // non-terminals must already exist or refer to themselves
+                            // FIXME: removing a non-terminal doesn't invalidate others
+                            | _ ->
+                                if not <| Regex.IsMatch(symbol, nonTerminalRegex) then
+                                    None
                                 else
-                                    None)
-            try
-                parts
-                |> Seq.map Option.get
-                |> Seq.toList
-                |> Some
-            with
-                | error -> None
+                                    let symbol = symbol.Substring(1, symbol.Length - 2)
+                                    if Set.contains symbol nonTerminals
+                                       || (Option.isSome productionHead && symbol = Option.get productionHead) then
+                                        Some (NonTerminal symbol)
+                                    else
+                                        None)
+                try
+                    parts
+                    |> Seq.map Option.get
+                    |> Seq.toList
+                    |> Some
+                with
+                    | error -> None
 
-    let addProductionRuleButton =
-        let buttonEnabled = Option.isSome productionHead && Option.isSome productionBody
-        Bulma.button.a [
-            prop.text "adicionar"
-            prop.disabled (not buttonEnabled)
-            prop.onClick
-                (fun _ ->
-                    let head, body = Option.get productionHead, Option.get productionBody
-                    { grammar with
-                          Initial = if grammar.Initial = "" then head else grammar.Initial
-                          Rules = Set.add (head, body) grammar.Rules }
-                    |> ChangeGrammarProductions
-                    |> dispatch)
-            color.isSuccess
-        ]
-
-    Bulma.block [
-        // existing productions
-        Html.ol [
-            prop.style [ style.paddingLeft (length.rem 1.0) ]
-            prop.children [
-                for rule in (Seq.sort grammar.Rules) do
-                    Html.li [ viewProductionRule rule ]
+        let addProductionRuleButton =
+            let buttonEnabled = Option.isSome productionHead && Option.isSome productionBody
+            Bulma.button.a [
+                prop.text "adicionar"
+                prop.disabled (not buttonEnabled)
+                prop.onClick
+                    (fun _ ->
+                        let head, body = Option.get productionHead, Option.get productionBody
+                        { grammar with
+                              Initial = if grammar.Initial = "" then head else grammar.Initial
+                              Rules = Set.add (head, body) grammar.Rules }
+                        |> ChangeGrammarProductions
+                        |> dispatch)
+                color.isSuccess
             ]
-        ]
-        // partially-filled rule fields
-        Bulma.columns [
-            columns.isMobile
-            columns.isMultiline
-            columns.isCentered
-            prop.children [
-                Bulma.column [
-                    column.isOneFifthDesktop
-                    prop.style [ style.paddingRight (length.rem 0.5) ]
-                    prop.children [
-                        Bulma.input.text [
-                            prop.value head
-                            prop.placeholder "<regra>"
-                            prop.onChange
-                                (fun head ->
-                                    (head, body)
-                                    |> SetGrammarProductionText
-                                    |> dispatch)
-                            if Option.isNone productionHead then color.isDanger
-                            text.isFamilyMonospace
+
+        Bulma.block [
+            // existing productions
+            Html.ol [
+                for rule in grammar.Rules do
+                    viewProductionRule rule
+            ]
+            // partially-filled rule fields
+            Bulma.columns [
+                columns.isMobile
+                columns.isMultiline
+                columns.isCentered
+                prop.children [
+                    Bulma.column [
+                        column.isOneFifthDesktop
+                        prop.style [ style.paddingRight (length.rem 0.5) ]
+                        prop.children [
+                            Bulma.input.text [
+                                prop.value head
+                                prop.placeholder "<regra>"
+                                prop.onChange
+                                    (fun head ->
+                                        (head, body)
+                                        |> SetGrammarProductionText
+                                        |> dispatch)
+                                if Option.isNone productionHead then color.isDanger
+                                text.isFamilyMonospace
+                            ]
                         ]
                     ]
-                ]
-                Bulma.column [
-                    column.isHalfMobile
-                    prop.style [ style.paddingLeft (length.rem 0.5) ]
-                    prop.children [
-                        Bulma.input.text [
-                            prop.value body
-                            prop.placeholder "corpo da <regra>"
-                            prop.onChange
-                                (fun body ->
-                                    (head, body)
-                                    |> SetGrammarProductionText
-                                    |> dispatch)
-                            if Option.isNone productionBody then color.isDanger
+                    Bulma.column [
+                        column.isHalfMobile
+                        prop.style [ style.paddingLeft (length.rem 0.5) ]
+                        prop.children [
+                            Bulma.input.text [
+                                prop.value body
+                                prop.placeholder "corpo da <regra>"
+                                prop.onChange
+                                    (fun body ->
+                                        (head, body)
+                                        |> SetGrammarProductionText
+                                        |> dispatch)
+                                if Option.isNone productionBody then color.isDanger
+                            ]
                         ]
                     ]
+                    Bulma.column [
+                        column.isNarrow
+                        prop.style [ style.paddingLeft (length.rem 0) ]
+                        prop.children [ addProductionRuleButton ]
+                    ]
                 ]
-                Bulma.column [
-                    column.isNarrow
-                    prop.style [ style.paddingLeft (length.rem 0) ]
-                    prop.children [ addProductionRuleButton ]
+            ]
+            // parser generation button
+            Bulma.level [
+                Bulma.levelItem [
+                    Bulma.button.button [
+                        prop.text "Gerar Analisador Sintático"
+                        prop.disabled (Option.isNone lexer || Set.isEmpty grammar.Rules)
+                        prop.onClick (fun _ -> GenerateParser grammar |> dispatch)
+                        button.isLarge
+                        color.isPrimary
+                    ]
                 ]
             ]
         ]
-        // parser generation button
-        Bulma.level [
-            Bulma.levelItem [
-                Bulma.button.button [
-                    prop.text "Gerar Analisador Sintático"
-                    // TODO: prop.onClick
-                    button.isLarge
-                    color.isPrimary
+
+    let viewTable =
+        let terminals =
+            Map.toSeq analysisTable
+            |> Seq.map
+                (fun ((topOfStack, lookahead), productions) -> lookahead)
+            |> Set.ofSeq
+        let nonTerminals =
+            Map.toSeq analysisTable
+            |> Seq.map
+                (fun ((topOfStack, lookahead), productions) -> topOfStack)
+            |> Set.ofSeq
+        Bulma.tableContainer [
+            Bulma.table [
+                table.isFullWidth
+                table.isHoverable
+                table.isBordered
+                table.isNarrow
+                prop.children [
+                    Html.thead [
+                        Html.tr [
+                            Html.th [
+                                prop.text "Produções"
+                                text.hasTextCentered
+                            ]
+                            for terminal in terminals do
+                                Html.th [
+                                    prop.text (sprintf "%s" terminal)
+                                    text.isFamilyMonospace
+                                ]
+                        ]
+                    ]
+                    Html.tbody [
+                        for topOfStack in nonTerminals do
+                            let head =
+                                NonTerminal topOfStack
+                                |> sprintSymbol
+                                |> sprintf "%s ::= "
+                            Html.tr [
+                                Html.td [
+                                    prop.text (sprintf "%s" topOfStack)
+                                    text.isFamilyMonospace
+                                ]
+                                for lookahead in terminals do
+                                    Html.td [
+                                        match Map.tryFind (topOfStack, lookahead) analysisTable with
+                                        | None ->
+                                            prop.text "-"
+                                        | Some productions ->
+                                            productions
+                                            |> Seq.map
+                                                (function
+                                                | [] ->
+                                                    head + "\u03B5"
+                                                | body ->
+                                                    body
+                                                    |> Seq.map sprintSymbol
+                                                    |> String.concat " "
+                                                    |> sprintf "%s%s" head)
+                                            |> String.concat " , "
+                                            |> prop.text
+                                            if Set.count productions > 1 then color.isDanger
+                                    ]
+                            ]
+                    ]
                 ]
+            ]
+        ]
+
+    Bulma.columns [
+        columns.isMultiline
+        columns.isCentered
+        prop.children [
+            Bulma.column [
+                column.isFull
+                prop.children [ viewSpec ]
+            ]
+            Bulma.column [
+                column.isFull
+                prop.children [ if not (Map.isEmpty analysisTable) then viewTable ]
             ]
         ]
     ]
@@ -738,6 +871,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                 Bulma.levelItem [
                     Bulma.button.button [
                         prop.text "Gerar Analisador Léxico"
+                        prop.disabled (Map.isEmpty spec)
                         prop.onClick (fun _ -> GenerateLexer spec |> dispatch)
                         button.isLarge
                         color.isPrimary
@@ -763,6 +897,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                             for symbol in lexer.Automaton.Alphabet do
                                 Html.th [
                                     prop.text (sprintf "%c" symbol |> String.visual)
+                                    text.isFamilyMonospace
                                 ]
                         ]
                     ]
@@ -792,11 +927,11 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                             Html.tr [
                                 Html.td [
                                     prop.text (sprintf "%s%d" prefix indexes.[state])
+                                    text.isFamilyMonospace
                                 ]
                                 for symbol in lexer.Automaton.Alphabet do
-                                    let next = Map.tryFind (state, symbol) lexer.Automaton.Transitions
                                     Html.td [
-                                        match next with
+                                        match Map.tryFind (state, symbol) lexer.Automaton.Transitions with
                                         | None ->
                                             prop.text "-"
                                         | Some next ->
@@ -804,6 +939,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                                                 prop.text "-"
                                             else
                                                 prop.text (sprintf "%d" indexes.[next])
+                                        text.isFamilyMonospace
                                     ]
                             ]
                     ]
@@ -829,13 +965,27 @@ let projectLexical spec lexer (kind, name, body) dispatch =
         ]
     ]
 
-let recognitionLexical lexer symbolTable dispatch =
+let recognition lexer symbolTable parser dispatch =
+    let hasLexer = Option.isSome lexer
+    let lexicalOk =
+        symbolTable
+        |> Seq.exists (function Error _ -> true | Ok _ -> false)
+        |> not
+    let hasParser = hasLexer && Option.isSome parser
+    let syntacticalOk =
+        match parser with
+        | None -> false
+        | Some parser ->
+            symbolTable
+            |> Seq.choose (function Ok token -> Some token | Error _ -> None)
+            |> Parser.accepts parser
+
     Bulma.columns [
-        // input
         columns.isMobile
         columns.isMultiline
         columns.isCentered
         prop.children [
+            // user input
             Bulma.column [
                 column.isHalfDesktop
                 column.isFullTablet
@@ -844,10 +994,18 @@ let recognitionLexical lexer symbolTable dispatch =
                     Bulma.textarea [
                         prop.custom ("rows", 24)
                         prop.onChange (SetInputText >> dispatch)
-                        prop.disabled (Option.isNone lexer)
-                        prop.placeholder
-                            (if Option.isSome lexer then "Forneça uma entrada ao lexer."
-                             else "O lexer ainda não foi gerado.")
+                        prop.placeholder "Forneça uma entrada ao analisador."
+                        if not hasLexer then
+                            color.hasBackgroundGreyLighter
+                        elif hasLexer && lexicalOk && not hasParser then
+                            color.isWarning
+                        elif hasLexer && lexicalOk && hasParser && syntacticalOk then
+                            color.isSuccess
+                        else
+                            color.isDanger
+                            if lexicalOk && not syntacticalOk then
+                                color.hasTextDanger
+                        text.isFamilyMonospace
                     ]
                 ]
             ]
@@ -887,7 +1045,7 @@ let recognitionLexical lexer symbolTable dispatch =
                                                 token.Token, token.Lexeme, token.Position, false
                                             | Error error ->
                                                 let pseudoLexeme =
-                                                    error.String
+                                                    error.Irritant
                                                     |> Seq.map (sprintf "%c")
                                                     |> String.concat ""
                                                 "ERRO LÉXICO", pseudoLexeme, error.Position, true
@@ -899,6 +1057,7 @@ let recognitionLexical lexer symbolTable dispatch =
                                             ]
                                             Html.td [
                                                 prop.text (String.visual lexeme)
+                                                text.isFamilyMonospace
                                             ]
                                             Html.td [
                                                 prop.text (sprintf "%d" position)
@@ -938,11 +1097,13 @@ let main model dispatch =
             ]
         | Syntactical ->
             Bulma.card [
-                Bulma.cardHeader [ cardTitle "Gramática" ]
+                Bulma.cardHeader [ cardTitle "Gramática LL(1)" ]
                 Bulma.cardContent [
                     projectSyntactical
                         model.Project.Syntax
+                        model.AnalysisTable
                         model.Project.Lexicon
+                        model.Lexer
                         model.GrammarProductionText
                         dispatch
                     ]
@@ -952,9 +1113,11 @@ let main model dispatch =
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Reconhecimento" ]
             Bulma.cardContent [
-                match model.Phase with
-                | Lexical -> recognitionLexical model.Lexer model.SymbolTable dispatch
-                | Syntactical -> () // TODO: recognitionSyntactical
+                recognition
+                    model.Lexer
+                    model.SymbolTable
+                    model.Parser
+                    dispatch
             ]
         ]
 
