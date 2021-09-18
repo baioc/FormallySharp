@@ -68,29 +68,10 @@ let api =
     |> Remoting.buildProxy<FormallySharp>
 
 let init () : Model * Cmd<Msg> =
-    // TODO: clear "empty" project on release
     let emptyProject =
         { Id = ""
-          Lexicon = Map.ofSeq [
-              "LPAREN", TokenClass(UserRegexp(@"\(", Regexp.singleton '('), 8)
-              "RPAREN", TokenClass(UserRegexp(@"\)", Regexp.singleton ')'), 8)
-              "PLUS", TokenClass(UserRegexp(@"\+", Regexp.ofSet "+"), 8)
-              "TIMES", TokenClass(UserRegexp(@"\*", Regexp.ofSet "*"), 8)
-              "ID", TokenClass(UserRegexp(@"[a-z]+", Regexp.ofSet [ 'a' .. 'z' ] |> Regexp.many), 6)
-              "WHITESPACE", Separator <| UserRegexp(@"\s", Regexp.ofSet " \t\n")
-          ]
-          Syntax =
-              { Initial = "E"
-                Rules = set [
-                    "E"  , [ NonTerminal "T"; NonTerminal "E'" ]
-                    "E'" , [ Terminal "PLUS"; NonTerminal "T"; NonTerminal "E'" ]
-                    "E'" , []
-                    "T"  , [ NonTerminal "F"; NonTerminal "T'" ]
-                    "T'" , [ Terminal "TIMES"; NonTerminal "F"; NonTerminal "T'" ]
-                    "T'" , []
-                    "F"  , [ Terminal "LPAREN"; NonTerminal "E"; Terminal "RPAREN" ]
-                    "F"  , [ Terminal "ID" ]
-                ] } }
+          Lexicon = Map.empty
+          Syntax = { Initial = ""; Rules = Set.empty } }
 
     let model =
         { Project = emptyProject
@@ -100,7 +81,7 @@ let init () : Model * Cmd<Msg> =
           SymbolTable = []
           RegularDefinitionText = "token", "", ""
           Parser = None
-          AnalysisTable = Map.ofSeq [ ("E", "ID"), set [ [ Terminal "A" ]; [ Terminal "B" ] ] ]
+          AnalysisTable = Map.empty
           GrammarProductionText = "", "" }
 
     model, Cmd.none
@@ -157,7 +138,13 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 .Timeout(5000)
                 .Type(AlertType.Success)
 
-        { model with Project = project },
+        // when loading a new project, we invalidate our analyzers
+        { model with
+              Lexer = None
+              SymbolTable = []
+              Parser = None
+              AnalysisTable = Map.empty
+              Project = project },
         SweetAlert.Run(toastAlert)
 
     | SetPhase phase ->
@@ -220,6 +207,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         { model with
               Lexer = Some lexer
+              Parser = None // invalidate parser
               SymbolTable = Lexer.tokenize lexer model.InputText |> List.ofSeq },
         SweetAlert.Run(toastAlert)
 
@@ -490,7 +478,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                 Bulma.levelItem [
                     Bulma.button.button [
                         prop.text "Gerar Analisador Sintático"
-                        prop.disabled (Option.isNone lexer)
+                        prop.disabled (Option.isNone lexer || Set.isEmpty grammar.Rules)
                         prop.onClick (fun _ -> GenerateParser grammar |> dispatch)
                         button.isLarge
                         color.isPrimary
@@ -559,7 +547,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                                                     |> sprintf "%s%s" head)
                                             |> String.concat " , "
                                             |> prop.text
-                                        text.isFamilyMonospace
+                                            if Set.count productions > 1 then color.isDanger
                                     ]
                             ]
                     ]
@@ -883,6 +871,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                 Bulma.levelItem [
                     Bulma.button.button [
                         prop.text "Gerar Analisador Léxico"
+                        prop.disabled (Map.isEmpty spec)
                         prop.onClick (fun _ -> GenerateLexer spec |> dispatch)
                         button.isLarge
                         color.isPrimary
@@ -995,7 +984,13 @@ let recognition enabled accepting symbolTable dispatch =
                         prop.placeholder
                             (if enabled then "Forneça uma entrada ao analisador."
                              else "O parser ainda não foi gerado.")
-                        if accepting then color.isSuccess else color.isDanger
+                        if enabled then
+                            if accepting then
+                                color.isSuccess
+                            else
+                                color.isDanger
+                                color.hasTextDanger
+                        text.isFamilyMonospace
                     ]
                 ]
             ]
