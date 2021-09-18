@@ -31,7 +31,7 @@ type Model = {
 
     // lexing-related state
     Lexer: Lexer option
-    SymbolTable: Result<TokenInstance, LexicalError> seq
+    SymbolTable: Result<TokenInstance, LexicalError> list
     RegularDefinitionText: string * string * string // inputs: kind, name, regex
 
     // parsing-related state
@@ -169,7 +169,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
               SymbolTable =
                   match model.Lexer with
                   | None -> model.SymbolTable
-                  | Some lexer -> Lexer.tokenize lexer text },
+                  | Some lexer -> Lexer.tokenize lexer text |> List.ofSeq },
         Cmd.none
 
     | GotError ex ->
@@ -220,7 +220,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         { model with
               Lexer = Some lexer
-              SymbolTable = Lexer.tokenize lexer model.InputText },
+              SymbolTable = Lexer.tokenize lexer model.InputText |> List.ofSeq },
         SweetAlert.Run(toastAlert)
 
     | SetGrammarProductionText (head, body) ->
@@ -277,7 +277,9 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 |> Set.unionMany
                 |> Map.ofSeq
 
-            { model with Parser = Some parser; AnalysisTable = table },
+            { model with
+                  Parser = Some parser
+                  AnalysisTable = table },
             ToastAlert("analisador sintático gerado")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
@@ -974,13 +976,13 @@ let projectLexical spec lexer (kind, name, body) dispatch =
         ]
     ]
 
-let recognitionLexical lexer symbolTable dispatch =
+let recognition enabled accepting symbolTable dispatch =
     Bulma.columns [
-        // input
         columns.isMobile
         columns.isMultiline
         columns.isCentered
         prop.children [
+            // user input
             Bulma.column [
                 column.isHalfDesktop
                 column.isFullTablet
@@ -989,10 +991,11 @@ let recognitionLexical lexer symbolTable dispatch =
                     Bulma.textarea [
                         prop.custom ("rows", 24)
                         prop.onChange (SetInputText >> dispatch)
-                        prop.disabled (Option.isNone lexer)
+                        prop.disabled (not enabled)
                         prop.placeholder
-                            (if Option.isSome lexer then "Forneça uma entrada ao lexer."
-                             else "O lexer ainda não foi gerado.")
+                            (if enabled then "Forneça uma entrada ao analisador."
+                             else "O parser ainda não foi gerado.")
+                        if accepting then color.isSuccess else color.isDanger
                     ]
                 ]
             ]
@@ -1097,12 +1100,29 @@ let main model dispatch =
             ]
 
     let recognitionInterface =
+        let ready = Option.isSome model.Lexer && Option.isSome model.Parser
+        let accepting =
+            let hasLexicalError =
+                model.SymbolTable
+                |> List.exists (function Error _ -> true | Ok _ -> false)
+            if hasLexicalError then
+                false
+            else
+                match model.Parser with
+                | None -> false
+                | Some parser ->
+                    model.SymbolTable
+                    |> Seq.choose (function Ok token -> Some token | Error _ -> None)
+                    |> Parser.accepts parser
+
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Reconhecimento" ]
             Bulma.cardContent [
-                match model.Phase with
-                | Lexical -> recognitionLexical model.Lexer model.SymbolTable dispatch
-                | Syntactical -> () // TODO: recognitionSyntactical
+                recognition
+                    ready
+                    accepting
+                    model.SymbolTable
+                    dispatch
             ]
         ]
 
