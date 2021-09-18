@@ -240,6 +240,7 @@ module Lexer =
 /// Syntactical spec, where terminals are assumed to identify tokens.
 type Grammar = Grammar<Identifier, Identifier>
 type Symbol = Symbol<Identifier, Identifier>
+type SyntacticalAnalysisTable = Map<Identifier * Identifier, Set<list<Symbol>>>
 
 // these help us handle the differences between a DPDA and an LL(1) parser
 type LL1State = Parse | Accept | Dead
@@ -394,6 +395,7 @@ type Project =
 /// Fable.Remoting, everything transmitted needs to be a (public) value type.
 type FormallySharp =
     { generateLexer: LexicalSpecification -> Async<Lexer>
+      generateParser: Grammar -> Async<Result<Parser, SyntacticalAnalysisTable>>
       saveProject: Project -> Async<unit>
       loadProject: Identifier -> Async<Project> }
 
