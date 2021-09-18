@@ -1,5 +1,6 @@
 namespace Shared
 
+open System.Collections.Generic
 open System.Text.RegularExpressions
 open System.Runtime.CompilerServices
 
@@ -91,7 +92,7 @@ type TokenInstance =
 
 /// Indicates a lexical error and keeps track of non-lexed input.
 type LexicalError =
-    { String: char seq
+    { Irritant: char seq
       Position: uint }
 
 /// Functions for creating and manipulating lexers.
@@ -194,7 +195,7 @@ module Lexer =
                 | Some lastToken -> yield Ok lastToken
                 | None -> ()
             else
-                let error = { Position = lexer.Start; String = lexer.String }
+                let error = { Position = lexer.Start; Irritant = lexer.String }
                 yield Error error // aka "unexpected end of file ..."
 
         // otherwise, apply transition logic and iterate down the input stream
@@ -223,7 +224,7 @@ module Lexer =
             elif justDied && (not wasAccepting) then
                 // make an error containing all input from this point forward
                 yield Error { Position = lexer.Start
-                              String = Seq.append lexer.String inputs }
+                              Irritant = Seq.append lexer.String inputs }
 
             else
                 // otherwise, keep going with the updated lexer
@@ -240,23 +241,145 @@ module Lexer =
 type Grammar = Grammar<Identifier, Identifier>
 type Symbol = Symbol<Identifier, Identifier>
 
-/// Due to multiple stack actions in a single transition, we only need 3 states.
-type LL1State = Dead | Parsing | Accept
+// these help us handle the differences between a DPDA and an LL(1) parser
+type LL1State = Parse | Accept | Dead
+type InputAction<'InputSymbol> = Consume | Keep of 'InputSymbol
+type ParserAction<'InputSymbol, 'StackSymbol> =
+    StackAction<'StackSymbol> * InputAction<'InputSymbol>
 
-/// Table-based LL(1) parser and its dynamic state.
+/// Table-based LL(1) parser.
 type Parser =
     { Automaton: Dpda<LL1State, Identifier, Symbol>
-      Initial: LL1State * Stack<Symbol> }
+      AcceptsEmpty: bool }
+
+    interface IAutomaton<(LL1State * Stack<Symbol>), TokenInstance, Result<ParserAction<TokenInstance, Symbol>, unit>> with
+        member this.View = this.Automaton.Current
+
+        member this.Step input =
+            let output, automaton = Automaton.step input.Token this.Automaton
+            let state = Automaton.view automaton
+            let automaton = { this.Automaton with Current = state }
+            let output =
+                match output with
+                | Error () -> Error ()
+                | Ok action ->
+                    // input should NOT be consumed when a derivation is performed
+                    match action, snd this.Automaton.Current with
+                    | ReplaceTop _, NonTerminal _ :: _ -> Ok (action, Keep input)
+                    | _ -> Ok (action, Consume)
+
+            output, { this with Automaton = automaton } :> IAutomaton<_, _, _>
 
 /// Functions for creating and manipulating LL(1) parsers.
 module Parser =
-    /// Builds a new Parser according to the given syntactical specification.
-    let make grammar =
-        failwith "TODO: Parser.make"
+    let [<Literal>] private Endmarker = "$"
 
-    /// Lazily compute a sequence of derivations based on a stream of input tokens.
-    let parse parser tokens =
-        failwith "TODO: Parser.parse"
+    /// <summary>
+    /// Makes an LL(1) parser according to the given syntactical specification.
+    /// </summary>
+    ///
+    /// <returns>
+    /// Either a ready-to-use `Parser` or a parsing table with LL(1) conflicts.
+    /// </returns>
+    let tryMake grammar =
+        let follows = Grammar.followSets grammar Endmarker
+
+        // finds all the entries in the table to contain a given production rule
+        let entriesForRule (head, body) =
+            Grammar.first body grammar
+            |> Seq.map
+                (function
+                // (head, x) for every x in FIRST(body)
+                | Some lookahead ->
+                    set [ (head, lookahead), body ]
+                // if epsilon is in FIRST(body), (head, x) for every x in FOLLOW(head)
+                | None ->
+                    follows.[head]
+                    |> Set.map (fun lookahead -> ((head, lookahead), body)))
+            |> Set.unionMany
+
+        // build the parsing table, with a set of productions at each cell
+        let entries = grammar.Rules |> Seq.map entriesForRule |> Set.unionMany
+        let mutable table = Dictionary()
+        for cell, rule in entries do
+            if table.ContainsKey(cell) then
+                table.[cell] <- Set.add rule table.[cell]
+            else
+                table.[cell] <- Set.singleton rule
+
+        let isLL1 =
+            table
+            |> Seq.forall (fun (entry: KeyValuePair<_, _>) -> Set.count entry.Value <= 1)
+        if not isLL1 then
+            table
+            |> Seq.map (fun entry -> entry.Key, entry.Value)
+            |> Map.ofSeq
+            |> Error
+        else
+            let mutable transitions = Dictionary()
+
+            let (|->) (state, input, topOfStack) (next, action) =
+                if transitions.ContainsKey((state, topOfStack)) then
+                    transitions.[(state, topOfStack)] <-
+                        Map.add input (next, action) transitions.[(state, topOfStack)]
+                else
+                    transitions.[(state, topOfStack)] <-
+                        Map.ofSeq [ input, (next, action) ]
+
+            // for every terminal, there's a transition (Parse -> Parse) where,
+            // if the top of the stack and the input symbol match, remove both
+            for symbol in grammar.Terminals do
+                (Parse, symbol, Terminal symbol) |-> (Parse, ReplaceTop [])
+
+            // for non-terminals, we add a transition that does a derivation
+            // on the stack based on the syntactical analysis table
+            // NOTE: PDAs always step on input, so the lookahead is consumed
+            for entry in table do
+                let (symbol, lookahead), rules = entry.Key, entry.Value
+                let derivation = Set.minElement rules
+                (Parse, lookahead, NonTerminal symbol) |-> (Parse, ReplaceTop derivation)
+
+            // matching the endmarker as a terminal moves to the accept state
+            do (Parse, Endmarker, Terminal Endmarker) |-> (Accept, ReplaceTop [])
+
+            let transitions =
+                Map.ofSeq <| seq {
+                    for entry in transitions do
+                        entry.Key, InputConsumingTransitions entry.Value
+                }
+
+            let automaton =
+                { Transitions = transitions
+                  Current = Parse, [ NonTerminal grammar.Initial; Terminal Endmarker ]
+                  Accepting = Set.singleton Accept
+                  Dead = Dead }
+
+            let acceptsEmtpy =
+                Grammar.first [ NonTerminal grammar.Initial ] grammar
+                |> Set.contains None
+
+            Ok { Automaton = automaton; AcceptsEmpty = acceptsEmtpy }
+
+    /// Tests whether a sequence of tokens is accepted by the given parser.
+    let accepts parser tokens =
+        if Seq.isEmpty tokens then
+            parser.AcceptsEmpty
+        else
+            let rec loop currentState inputs =
+                match Seq.tryHead inputs with
+                | None -> (fst <| Automaton.view currentState) = Accept
+                | Some input ->
+                    match Automaton.step input currentState with
+                    | Error (), _ -> false
+                    | Ok (_, Keep _), nextState -> loop nextState inputs
+                    | Ok (_, Consume), nextState -> loop nextState (Seq.tail inputs)
+
+            let tokens =
+                Seq.append
+                    tokens
+                    (Seq.singleton { Token = Endmarker; Lexeme = ""; Position = 0u })
+
+            loop parser tokens
 
 
 /// A formal language project.

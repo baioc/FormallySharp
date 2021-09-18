@@ -887,7 +887,7 @@ let recognitionLexical lexer symbolTable dispatch =
                                                 token.Token, token.Lexeme, token.Position, false
                                             | Error error ->
                                                 let pseudoLexeme =
-                                                    error.String
+                                                    error.Irritant
                                                     |> Seq.map (sprintf "%c")
                                                     |> String.concat ""
                                                 "ERRO LÉXICO", pseudoLexeme, error.Position, true
