@@ -965,7 +965,21 @@ let projectLexical spec lexer (kind, name, body) dispatch =
         ]
     ]
 
-let recognition enabled accepting symbolTable dispatch =
+let recognition lexer symbolTable parser dispatch =
+    let hasLexer = Option.isSome lexer
+    let lexicalOk =
+        symbolTable
+        |> Seq.exists (function Error _ -> true | Ok _ -> false)
+        |> not
+    let hasParser = hasLexer && Option.isSome parser
+    let syntacticalOk =
+        match parser with
+        | None -> false
+        | Some parser ->
+            symbolTable
+            |> Seq.choose (function Ok token -> Some token | Error _ -> None)
+            |> Parser.accepts parser
+
     Bulma.columns [
         columns.isMobile
         columns.isMultiline
@@ -980,15 +994,16 @@ let recognition enabled accepting symbolTable dispatch =
                     Bulma.textarea [
                         prop.custom ("rows", 24)
                         prop.onChange (SetInputText >> dispatch)
-                        prop.disabled (not enabled)
-                        prop.placeholder
-                            (if enabled then "Forneça uma entrada ao analisador."
-                             else "O parser ainda não foi gerado.")
-                        if enabled then
-                            if accepting then
-                                color.isSuccess
-                            else
-                                color.isDanger
+                        prop.placeholder "Forneça uma entrada ao analisador."
+                        if not hasLexer then
+                            color.hasBackgroundGreyLighter
+                        elif hasLexer && lexicalOk && not hasParser then
+                            color.isWarning
+                        elif hasLexer && lexicalOk && hasParser && syntacticalOk then
+                            color.isSuccess
+                        else
+                            color.isDanger
+                            if lexicalOk && not syntacticalOk then
                                 color.hasTextDanger
                         text.isFamilyMonospace
                     ]
@@ -1095,28 +1110,13 @@ let main model dispatch =
             ]
 
     let recognitionInterface =
-        let ready = Option.isSome model.Lexer && Option.isSome model.Parser
-        let accepting =
-            let hasLexicalError =
-                model.SymbolTable
-                |> List.exists (function Error _ -> true | Ok _ -> false)
-            if hasLexicalError then
-                false
-            else
-                match model.Parser with
-                | None -> false
-                | Some parser ->
-                    model.SymbolTable
-                    |> Seq.choose (function Ok token -> Some token | Error _ -> None)
-                    |> Parser.accepts parser
-
         Bulma.card [
             Bulma.cardHeader [ cardTitle "Reconhecimento" ]
             Bulma.cardContent [
                 recognition
-                    ready
-                    accepting
+                    model.Lexer
                     model.SymbolTable
+                    model.Parser
                     dispatch
             ]
         ]
