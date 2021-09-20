@@ -239,10 +239,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         | Error table ->
             { model with Parser = None; AnalysisTable = table },
             ToastAlert("a gramática não é LL(1)")
-                .Position(AlertPosition.Top)
+                .Position(AlertPosition.Center)
                 .ConfirmButton(true)
                 .Timeout(13000)
-                .Type(AlertType.Error)
+                .Type(AlertType.Warning)
             |> SweetAlert.Run
 
         | Ok parser ->
@@ -896,7 +896,7 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                             ]
                             for symbol in lexer.Automaton.Alphabet do
                                 Html.th [
-                                    prop.text (sprintf "%c" symbol |> String.visual)
+                                    prop.text (sprintf "%c" symbol |> Regexp.escape |> String.visual)
                                     text.isFamilyMonospace
                                 ]
                         ]
@@ -1056,7 +1056,7 @@ let recognition lexer symbolTable parser dispatch =
                                                 else color.hasTextInfo
                                             ]
                                             Html.td [
-                                                prop.text (String.visual lexeme)
+                                                prop.text (lexeme |> Regexp.escape |> String.visual)
                                                 text.isFamilyMonospace
                                             ]
                                             Html.td [
