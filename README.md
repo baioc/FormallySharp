@@ -5,7 +5,7 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/baioc/FormallySharp?label=commits)
 
 Formally# is an online formal language designer.
-**Check it out at [www.formallysharp.codes](http://www.formallysharp.codes)**
+**Check it out at [formallysharp.azurewebsites.net](https://formallysharp.azurewebsites.net/)**
 
 
 ## SAFE Stack
