@@ -33,12 +33,12 @@ type Model = {
     // lexing-related state
     Lexer: Lexer option
     SymbolTable: Result<TokenInstance, LexicalError> list
-    RegularDefinitionText: string * string * string // inputs: kind, name, regex
+    RegularDefinitionText: string * string * string
 
     // parsing-related state
     Parser: Parser option
     AnalysisTable: SyntacticalAnalysisTable
-    GrammarProductionText: string * string // inputs: head, body
+    GrammarProductionText: string * string
 }
 
 type Msg =
@@ -53,12 +53,12 @@ type Msg =
     | SetInputText of string
     | GotError of exn
     // regular grammar messages
-    | SetRegularDefinitionText of string * string * string
+    | SetRegularDefinitionText of kind:string * name:string * body:string
     | ChangeRegularDefinitions of LexicalSpecification
     | GenerateLexer of LexicalSpecification
     | GeneratedLexer of Lexer
     // context-free gramamr messages
-    | SetGrammarProductionText of string * string
+    | SetGrammarProductionText of head:string * body:string
     | ChangeGrammarProductions of Grammar
     | GenerateParser of Grammar
     | GeneratedParser of Result<Parser, SyntacticalAnalysisTable>

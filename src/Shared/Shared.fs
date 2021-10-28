@@ -63,19 +63,17 @@ type UserRegexp =
     static member UserRegexp(string, regexp) =
         { String = string; Regexp = regexp }
 
-type TokenPriority = int
-
 type RegularDefinition =
-    | TokenClass of UserRegexp * TokenPriority
+    | TokenClass of UserRegexp * priority:int
     | Fragment of UserRegexp
     | Separator of UserRegexp
 
 type LexicalSpecification = Map<Identifier, RegularDefinition>
 
 type LexerState =
-    | AcceptToken of Identifier * Set<int> * TokenPriority
-    | AcceptSeparator of Identifier * Set<int>
-    | Intermediary of Identifier * Set<int>
+    | AcceptToken of name:Identifier * discriminant:Set<int> * priority:int
+    | AcceptSeparator of name:Identifier * discriminant:Set<int>
+    | Intermediary of name:Identifier * discriminant:Set<int>
 
 /// Current lexer state over some input.
 type Lexer =
