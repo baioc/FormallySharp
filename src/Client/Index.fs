@@ -2,9 +2,10 @@ module Index
 
 open System.Text.RegularExpressions
 
+open Browser
 open Elmish
-open Fable.Remoting.Client
 open Elmish.SweetAlert
+open Fable.Remoting.Client
 open Feliz
 open Feliz.Bulma
 
@@ -1234,6 +1235,16 @@ let toolbar model dispatch =
 
 let view (model: Model) (dispatch: Msg -> unit) =
     let repoUrl = "https://github.com/baioc/FormallySharp"
+    let themes = [
+        @"https://cdn.jsdelivr.net/npm/bulma@0.9.0/css/bulma.min.css"
+        @"https://cdnjs.cloudflare.com/ajax/libs/bulmaswatch/0.8.1/cosmo/bulmaswatch.min.css"
+        @"https://cdnjs.cloudflare.com/ajax/libs/bulmaswatch/0.8.1/darkly/bulmaswatch.min.css"
+    ]
+    let changeTheme _ =
+        let theme = document.getElementById("theme")
+        let current = List.findIndex ((=) (theme.getAttribute("href"))) themes
+        let next = (current + 1) % themes.Length
+        do theme.setAttribute("href", themes.[next])
 
     let header =
         Bulma.navbar [
@@ -1247,6 +1258,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                 prop.text "Formally#"
                                 title.is1
                                 color.hasTextWhite
+                                prop.onClick changeTheme
                             ]
                         ]
                         Bulma.levelRight [
