@@ -112,9 +112,10 @@ module Lexer =
             |> Seq.choose
                 (fun (name, def) ->
                     match def with
-                    | Fragment _ -> None
-                    | TokenClass (r, _)
-                    | Separator r -> Some <| makeAutomaton name r.Regexp)
+                    | TokenClass (r, _) | Separator r ->
+                        Some (name, makeAutomaton name r.Regexp)
+                    | Fragment _ -> None)
+            |> Map.ofSeq
 
         let undiscriminatedUnion union dfa =
             Dfa.toNfa dfa
@@ -128,36 +129,36 @@ module Lexer =
         // compute the determinized union of all automatons
         let union =
             automatons
+            |> Map.toSeq
+            |> Seq.map snd
             |> Seq.fold undiscriminatedUnion initial
             |> Nfa.toDfa
 
-        // filter out dead transitions and identify accepting states
+        // filter out dead transitions and identify accepting states + provenance
         let automaton =
             union
             |> Dfa.filter (fun (q, a) q' -> q' <> set [ dead ])
             |> Dfa.map
-                (fun state ->
-                    Set.map
-                        (fun (prefix, discriminant) ->
-                            if Set.contains state union.Accepting then
-                                match Map.tryFind prefix spec with
-                                | Some (TokenClass (r, priority)) ->
-                                    AcceptToken (prefix, discriminant, priority)
-                                | Some (Separator r) ->
-                                    AcceptSeparator (prefix, discriminant)
-                                | notAccepting ->
-                                    Intermediary (prefix, discriminant)
-                            else
-                                Intermediary (prefix, discriminant))
-                        state)
+                (Set.map
+                    (fun ((prefix, discriminant) as state) ->
+                        match Map.tryFind prefix automatons with
+                        | Some automaton when Set.contains state automaton.Accepting ->
+                            match Map.find prefix spec with
+                            | TokenClass (r, priority) ->
+                                AcceptToken (prefix, discriminant, priority)
+                            | Separator r ->
+                                AcceptSeparator (prefix, discriminant)
+                            | Fragment r ->
+                                Intermediary (prefix, discriminant)
+                        | notAccepting -> Intermediary state))
 
         { Automaton = automaton; Initial = automaton.Current
           String = ""; Start = 0u; Position = 0u }
 
     /// Makes a token iff the lexer is currently accepting a non-empty lexeme.
     let private tryMakeToken lexer =
-        if lexer.Automaton.Current = Set.empty then
-            None // ^ dead state, so obviously not accepting
+        if not (Set.contains lexer.Automaton.Current lexer.Automaton.Accepting) then
+            None
         elif lexer.String = "" then
             None // a lexer must never produce a token from an empty lexeme
         else
