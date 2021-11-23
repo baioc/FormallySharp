@@ -34,11 +34,12 @@ type Model = {
     Lexer: Lexer option
     SymbolTable: Result<TokenInstance, LexicalError> list
     RegularDefinitionText: string * string * string
+    LexicalAnalysisTable: ReactElement option
 
     // parsing-related state
     Parser: Parser option
-    AnalysisTable: SyntacticalAnalysisTable
     GrammarProductionText: string * string
+    SyntacticalAnalysisTable: ReactElement option
 }
 
 type Msg =
@@ -63,10 +64,153 @@ type Msg =
     | GenerateParser of Grammar
     | GeneratedParser of Result<Parser, SyntacticalAnalysisTable>
 
+
 let api =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<FormallySharp>
+
+
+let viewLexer (lexer: Lexer) =
+    Bulma.tableContainer [
+        Bulma.table [
+            table.isFullWidth
+            table.isHoverable
+            table.isBordered
+            table.isNarrow
+            prop.children [
+                Html.thead [
+                    Html.tr [
+                        Html.th [
+                            prop.text "Transições"
+                            text.hasTextCentered
+                        ]
+                        for symbol in lexer.Automaton.Alphabet do
+                            Html.th [
+                                prop.text (sprintf "%c" symbol |> Regexp.escape |> String.visual)
+                                text.isFamilyMonospace
+                            ]
+                    ]
+                ]
+                Html.tbody [
+                    // we map states to numbers in order to avoid a huge table
+                    let states =
+                        lexer.Automaton.States
+                        |> Set.remove lexer.Automaton.Dead
+                        |> Set.toArray
+                        |> Array.sort
+                    let indexes =
+                        states
+                        |> Seq.mapi (fun i x -> (x, i))
+                        |> Map.ofSeq
+                    for state in states do
+                        let prefix = ""
+                        let prefix =
+                            if Set.contains state lexer.Automaton.Accepting then
+                                "*" + prefix
+                            else
+                                " " + prefix
+                        let prefix =
+                            if state = lexer.Automaton.Current then
+                                "-> " + prefix
+                            else
+                                "   " + prefix
+                        Html.tr [
+                            Html.td [
+                                prop.text (sprintf "%s%d" prefix indexes.[state])
+                                text.isFamilyMonospace
+                            ]
+                            for symbol in lexer.Automaton.Alphabet do
+                                Html.td [
+                                    match Map.tryFind (state, symbol) lexer.Automaton.Transitions with
+                                    | None ->
+                                        prop.text "-"
+                                    | Some next ->
+                                        if next = lexer.Automaton.Dead then
+                                            prop.text "-"
+                                        else
+                                            prop.text (sprintf "%d" indexes.[next])
+                                    text.isFamilyMonospace
+                                ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
+let sprintSymbol =
+        function
+        | Terminal s -> s
+        | NonTerminal n -> sprintf "<%s>" n
+
+let viewTable analysisTable =
+    let terminals =
+        Map.toSeq analysisTable
+        |> Seq.map
+            (fun ((topOfStack, lookahead), productions) -> lookahead)
+        |> Set.ofSeq
+    let nonTerminals =
+        Map.toSeq analysisTable
+        |> Seq.map
+            (fun ((topOfStack, lookahead), productions) -> topOfStack)
+        |> Set.ofSeq
+    Bulma.tableContainer [
+        Bulma.table [
+            table.isFullWidth
+            table.isHoverable
+            table.isBordered
+            table.isNarrow
+            prop.children [
+                Html.thead [
+                    Html.tr [
+                        Html.th [
+                            prop.text "Produções"
+                            text.hasTextCentered
+                        ]
+                        for terminal in terminals do
+                            Html.th [
+                                prop.text (sprintf "%s" terminal)
+                                text.isFamilyMonospace
+                            ]
+                    ]
+                ]
+                Html.tbody [
+                    for topOfStack in nonTerminals do
+                        let head =
+                            NonTerminal topOfStack
+                            |> sprintSymbol
+                            |> sprintf "%s ::= "
+                        Html.tr [
+                            Html.td [
+                                prop.text (sprintf "%s" topOfStack)
+                                text.isFamilyMonospace
+                            ]
+                            for lookahead in terminals do
+                                Html.td [
+                                    match Map.tryFind (topOfStack, lookahead) analysisTable with
+                                    | None ->
+                                        prop.text "-"
+                                    | Some productions ->
+                                        productions
+                                        |> Seq.map
+                                            (function
+                                            | [] ->
+                                                head + "\u03B5"
+                                            | body ->
+                                                body
+                                                |> Seq.map sprintSymbol
+                                                |> String.concat " "
+                                                |> sprintf "%s%s" head)
+                                        |> String.concat " , "
+                                        |> prop.text
+                                        if Set.count productions > 1 then color.isDanger
+                                ]
+                        ]
+                ]
+            ]
+        ]
+    ]
+
 
 let init () : Model * Cmd<Msg> =
     let emptyProject =
@@ -81,8 +225,9 @@ let init () : Model * Cmd<Msg> =
           Lexer = None
           SymbolTable = []
           RegularDefinitionText = "token", "", ""
+          LexicalAnalysisTable = None
           Parser = None
-          AnalysisTable = Map.empty
+          SyntacticalAnalysisTable = None
           GrammarProductionText = "", "" }
 
     model, Cmd.none
@@ -143,8 +288,9 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         { model with
               Lexer = None
               SymbolTable = []
+              LexicalAnalysisTable = None
               Parser = None
-              AnalysisTable = Map.empty
+              SyntacticalAnalysisTable = None
               Project = project },
         SweetAlert.Run(toastAlert)
 
@@ -208,6 +354,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
         { model with
               Lexer = Some lexer
+              LexicalAnalysisTable = Some <| viewLexer lexer
               Parser = None // invalidate parser
               SymbolTable = Lexer.tokenize lexer model.InputText |> List.ofSeq },
         SweetAlert.Run(toastAlert)
@@ -238,7 +385,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | GeneratedParser result ->
         match result with
         | Error table ->
-            { model with Parser = None; AnalysisTable = table },
+            { model with Parser = None; SyntacticalAnalysisTable = Some <| viewTable table },
             ToastAlert("a gramática não é LL(1)")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
@@ -268,7 +415,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
             { model with
                   Parser = Some parser
-                  AnalysisTable = table },
+                  SyntacticalAnalysisTable = Some <| viewTable table },
             ToastAlert("analisador sintático gerado")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
@@ -278,11 +425,6 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
 
 let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: string) dispatch =
-    let sprintSymbol =
-        function
-        | Terminal s -> s
-        | NonTerminal n -> sprintf "<%s>" n
-
     let viewProductionRule (head, body) =
         Bulma.columns [
             columns.isVCentered
@@ -488,74 +630,6 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
             ]
         ]
 
-    let viewTable =
-        let terminals =
-            Map.toSeq analysisTable
-            |> Seq.map
-                (fun ((topOfStack, lookahead), productions) -> lookahead)
-            |> Set.ofSeq
-        let nonTerminals =
-            Map.toSeq analysisTable
-            |> Seq.map
-                (fun ((topOfStack, lookahead), productions) -> topOfStack)
-            |> Set.ofSeq
-        Bulma.tableContainer [
-            Bulma.table [
-                table.isFullWidth
-                table.isHoverable
-                table.isBordered
-                table.isNarrow
-                prop.children [
-                    Html.thead [
-                        Html.tr [
-                            Html.th [
-                                prop.text "Produções"
-                                text.hasTextCentered
-                            ]
-                            for terminal in terminals do
-                                Html.th [
-                                    prop.text (sprintf "%s" terminal)
-                                    text.isFamilyMonospace
-                                ]
-                        ]
-                    ]
-                    Html.tbody [
-                        for topOfStack in nonTerminals do
-                            let head =
-                                NonTerminal topOfStack
-                                |> sprintSymbol
-                                |> sprintf "%s ::= "
-                            Html.tr [
-                                Html.td [
-                                    prop.text (sprintf "%s" topOfStack)
-                                    text.isFamilyMonospace
-                                ]
-                                for lookahead in terminals do
-                                    Html.td [
-                                        match Map.tryFind (topOfStack, lookahead) analysisTable with
-                                        | None ->
-                                            prop.text "-"
-                                        | Some productions ->
-                                            productions
-                                            |> Seq.map
-                                                (function
-                                                | [] ->
-                                                    head + "\u03B5"
-                                                | body ->
-                                                    body
-                                                    |> Seq.map sprintSymbol
-                                                    |> String.concat " "
-                                                    |> sprintf "%s%s" head)
-                                            |> String.concat " , "
-                                            |> prop.text
-                                            if Set.count productions > 1 then color.isDanger
-                                    ]
-                            ]
-                    ]
-                ]
-            ]
-        ]
-
     Bulma.columns [
         columns.isMultiline
         columns.isCentered
@@ -564,14 +638,17 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                 column.isFull
                 prop.children [ viewSpec ]
             ]
-            Bulma.column [
-                column.isFull
-                prop.children [ if not (Map.isEmpty analysisTable) then viewTable ]
-            ]
+            match analysisTable with
+            | None -> ()
+            | Some table ->
+                Bulma.column [
+                    column.isFull
+                    prop.children [ table ]
+                ]
         ]
     ]
 
-let projectLexical spec lexer (kind, name, body) dispatch =
+let projectLexical spec analysisTable (kind, name, body) dispatch =
     // kinds of regular definitions
     let tokenOption = "token"
     let fragmentOption = "fragmento"
@@ -881,73 +958,6 @@ let projectLexical spec lexer (kind, name, body) dispatch =
             ]
         ]
 
-    let viewLexer (lexer: Lexer) =
-        Bulma.tableContainer [
-            Bulma.table [
-                table.isFullWidth
-                table.isHoverable
-                table.isBordered
-                table.isNarrow
-                prop.children [
-                    Html.thead [
-                        Html.tr [
-                            Html.th [
-                                prop.text "Transições"
-                                text.hasTextCentered
-                            ]
-                            for symbol in lexer.Automaton.Alphabet do
-                                Html.th [
-                                    prop.text (sprintf "%c" symbol |> Regexp.escape |> String.visual)
-                                    text.isFamilyMonospace
-                                ]
-                        ]
-                    ]
-                    Html.tbody [
-                        // we map states to numbers in order to avoid a huge table
-                        let states =
-                            lexer.Automaton.States
-                            |> Set.remove lexer.Automaton.Dead
-                            |> Set.toArray
-                            |> Array.sort
-                        let indexes =
-                            states
-                            |> Seq.mapi (fun i x -> (x, i))
-                            |> Map.ofSeq
-                        for state in states do
-                            let prefix = ""
-                            let prefix =
-                                if Set.contains state lexer.Automaton.Accepting then
-                                    "*" + prefix
-                                else
-                                    " " + prefix
-                            let prefix =
-                                if state = lexer.Automaton.Current then
-                                    "-> " + prefix
-                                else
-                                    "   " + prefix
-                            Html.tr [
-                                Html.td [
-                                    prop.text (sprintf "%s%d" prefix indexes.[state])
-                                    text.isFamilyMonospace
-                                ]
-                                for symbol in lexer.Automaton.Alphabet do
-                                    Html.td [
-                                        match Map.tryFind (state, symbol) lexer.Automaton.Transitions with
-                                        | None ->
-                                            prop.text "-"
-                                        | Some next ->
-                                            if next = lexer.Automaton.Dead then
-                                                prop.text "-"
-                                            else
-                                                prop.text (sprintf "%d" indexes.[next])
-                                        text.isFamilyMonospace
-                                    ]
-                            ]
-                    ]
-                ]
-            ]
-        ]
-
     Bulma.columns [
         columns.isMultiline
         columns.isCentered
@@ -956,12 +966,12 @@ let projectLexical spec lexer (kind, name, body) dispatch =
                 column.isFull
                 prop.children [ viewSpec ]
             ]
-            match lexer with
+            match analysisTable with
             | None -> ()
-            | Some lexer ->
+            | Some table ->
                 Bulma.column [
                     column.isFull
-                    prop.children [ viewLexer lexer ]
+                    prop.children [ table ]
                 ]
         ]
     ]
@@ -1092,7 +1102,7 @@ let main model dispatch =
                 Bulma.cardContent [
                     projectLexical
                         model.Project.Lexicon
-                        model.Lexer
+                        model.LexicalAnalysisTable
                         model.RegularDefinitionText
                         dispatch ]
             ]
@@ -1102,7 +1112,7 @@ let main model dispatch =
                 Bulma.cardContent [
                     projectSyntactical
                         model.Project.Syntax
-                        model.AnalysisTable
+                        model.SyntacticalAnalysisTable
                         model.Project.Lexicon
                         model.Lexer
                         model.GrammarProductionText
