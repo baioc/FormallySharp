@@ -82,7 +82,7 @@ let viewLexer (lexer: Lexer) =
                 Html.thead [
                     Html.tr [
                         Html.th [
-                            prop.text "Transições"
+                            prop.text "Transitions"
                             text.hasTextCentered
                         ]
                         for symbol in lexer.Automaton.Alphabet do
@@ -164,7 +164,7 @@ let viewTable analysisTable =
                 Html.thead [
                     Html.tr [
                         Html.th [
-                            prop.text "Produções"
+                            prop.text "Productions"
                             text.hasTextCentered
                         ]
                         for terminal in terminals do
@@ -241,7 +241,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | SaveProject project ->
         let toastAlert =
-            ToastAlert(sprintf "salvando projeto para \"%s\"..." project.Id)
+            ToastAlert(sprintf "saving project \"%s\"..." project.Id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
@@ -254,7 +254,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | SavedProject id ->
         let toastAlert =
-            ToastAlert(sprintf "projeto para \"%s\" foi salvo" id)
+            ToastAlert(sprintf "project \"%s\" has been saved" id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Timeout(3000)
@@ -265,7 +265,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | LoadProject id ->
         let toastAlert =
-            ToastAlert(sprintf "carregando projeto para \"%s\"..." id)
+            ToastAlert(sprintf "loading project \"%s\"..." id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
@@ -278,7 +278,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | LoadedProject project ->
         let toastAlert =
-            ToastAlert(sprintf "projeto para \"%s\" foi carregado" project.Id)
+            ToastAlert(sprintf "project \"%s\" loaded" project.Id)
                 .Position(AlertPosition.TopEnd)
                 .ConfirmButton(true)
                 .Timeout(5000)
@@ -308,11 +308,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GotError ex ->
         let toastAlert =
-#if DEBUG   // during development, print the specific API call that failed
-            ToastAlert(string ex.Message)
-#else       // on release mode, we have a generic error message for users
-            ToastAlert("erro ao efetuar operação")
-#endif
+            ToastAlert("server error: " + string ex.Message)
                 .Position(AlertPosition.Top)
                 .ConfirmButton(true)
                 .Timeout(13000)
@@ -333,7 +329,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GenerateLexer spec ->
         let toastAlert =
-            ToastAlert("gerando analisador léxico...")
+            ToastAlert("generating lexer...")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
@@ -346,7 +342,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GeneratedLexer lexer ->
         let toastAlert =
-            ToastAlert("analisador léxico gerado")
+            ToastAlert("lexer generated")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
                 .Timeout(3000)
@@ -371,7 +367,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GenerateParser grammar ->
         let toastAlert =
-            ToastAlert("gerando analisador sintático...")
+            ToastAlert("generating LL(1) parser...")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(false)
                 .Type(AlertType.Info)
@@ -386,7 +382,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         match result with
         | Error table ->
             { model with Parser = None; SyntacticalAnalysisTable = Some <| viewTable table },
-            ToastAlert("a gramática não é LL(1)")
+            ToastAlert("the grammar is not LL(1)")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
                 .Timeout(13000)
@@ -416,7 +412,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             { model with
                   Parser = Some parser
                   SyntacticalAnalysisTable = Some <| viewTable table },
-            ToastAlert("analisador sintático gerado")
+            ToastAlert("parser generated")
                 .Position(AlertPosition.Center)
                 .ConfirmButton(true)
                 .Timeout(3000)
@@ -551,7 +547,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
         let addProductionRuleButton =
             let buttonEnabled = Option.isSome productionHead && Option.isSome productionBody
             Bulma.button.a [
-                prop.text "adicionar"
+                prop.text "add"
                 prop.disabled (not buttonEnabled)
                 prop.onClick
                     (fun _ ->
@@ -582,7 +578,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                         prop.children [
                             Bulma.input.text [
                                 prop.value head
-                                prop.placeholder "<regra>"
+                                prop.placeholder "<NonTerminal>"
                                 prop.onChange
                                     (fun head ->
                                         (head, body)
@@ -599,7 +595,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                         prop.children [
                             Bulma.input.text [
                                 prop.value body
-                                prop.placeholder "corpo da <regra>"
+                                prop.placeholder "production body"
                                 prop.onChange
                                     (fun body ->
                                         (head, body)
@@ -620,7 +616,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
             Bulma.level [
                 Bulma.levelItem [
                     Bulma.button.button [
-                        prop.text "Gerar Analisador Sintático"
+                        prop.text "Generate Parser"
                         prop.disabled (Option.isNone lexer || Set.isEmpty grammar.Rules)
                         prop.onClick (fun _ -> GenerateParser grammar |> dispatch)
                         button.isLarge
@@ -651,8 +647,8 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
 let projectLexical spec analysisTable (kind, name, body) dispatch =
     // kinds of regular definitions
     let tokenOption = "token"
-    let fragmentOption = "fragmento"
-    let separatorOption = "separador"
+    let fragmentOption = "fragment"
+    let separatorOption = "separator"
 
     let regexp =
         if kind = fragmentOption then
@@ -721,7 +717,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
         let buttonEnabled = nameIsValid && regexIsValid
         let willOverwrite = Map.containsKey name spec
         Bulma.button.a [
-            prop.text (if not willOverwrite then "adicionar" else sprintf "editar %s" name)
+            prop.text (if not willOverwrite then "add" else sprintf "edit %s" name)
             prop.disabled (not buttonEnabled)
             prop.onClick
                 (fun _ ->
@@ -909,7 +905,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
                         prop.children [
                             Bulma.input.text [
                                 prop.value name
-                                prop.placeholder "nome"
+                                prop.placeholder "name"
                                 prop.onChange
                                     (fun name ->
                                         (kind, name, body)
@@ -926,7 +922,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
                         prop.children [
                             Bulma.input.text [
                                 prop.value body
-                                prop.placeholder "expressão regular"
+                                prop.placeholder "regular expression"
                                 prop.onChange
                                     (fun body ->
                                         (kind, name, body)
@@ -948,7 +944,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
             Bulma.level [
                 Bulma.levelItem [
                     Bulma.button.button [
-                        prop.text "Gerar Analisador Léxico"
+                        prop.text "Generate Lexer"
                         prop.disabled (Map.isEmpty spec)
                         prop.onClick (fun _ -> GenerateLexer spec |> dispatch)
                         button.isLarge
@@ -1005,7 +1001,7 @@ let recognition lexer symbolTable parser dispatch =
                     Bulma.textarea [
                         prop.custom ("rows", 24)
                         prop.onChange (SetInputText >> dispatch)
-                        prop.placeholder "Forneça uma entrada ao analisador."
+                        prop.placeholder "Test input goes here."
                         if not hasLexer then
                             color.hasBackgroundGreyLighter
                         elif hasLexer && lexicalOk && not hasParser then
@@ -1039,11 +1035,11 @@ let recognition lexer symbolTable parser dispatch =
                                             text.hasTextCentered
                                         ]
                                         Html.th [
-                                            prop.text "Lexema"
+                                            prop.text "Lexeme"
                                             text.hasTextCentered
                                         ]
                                         Html.th [
-                                            prop.text "Posição"
+                                            prop.text "Position"
                                             text.hasTextCentered
                                         ]
                                     ]
@@ -1059,7 +1055,7 @@ let recognition lexer symbolTable parser dispatch =
                                                     error.Irritant
                                                     |> Seq.map (sprintf "%c")
                                                     |> String.concat ""
-                                                "ERRO LÉXICO", pseudoLexeme, error.Position, true
+                                                "ERROR", pseudoLexeme, error.Position, true
                                         Html.tr [
                                             Html.td [
                                                 prop.text kind
@@ -1098,7 +1094,7 @@ let main model dispatch =
         match model.Phase with
         | Lexical ->
             Bulma.card [
-                Bulma.cardHeader [ cardTitle "Especificação Léxica" ]
+                Bulma.cardHeader [ cardTitle "Lexical Specification" ]
                 Bulma.cardContent [
                     projectLexical
                         model.Project.Lexicon
@@ -1108,7 +1104,7 @@ let main model dispatch =
             ]
         | Syntactical ->
             Bulma.card [
-                Bulma.cardHeader [ cardTitle "Gramática LL(1)" ]
+                Bulma.cardHeader [ cardTitle "LL(1) Grammar" ]
                 Bulma.cardContent [
                     projectSyntactical
                         model.Project.Syntax
@@ -1122,7 +1118,7 @@ let main model dispatch =
 
     let recognitionInterface =
         Bulma.card [
-            Bulma.cardHeader [ cardTitle "Reconhecimento" ]
+            Bulma.cardHeader [ cardTitle "Recognition" ]
             Bulma.cardContent [
                 recognition
                     model.Lexer
@@ -1176,7 +1172,7 @@ let toolbar model dispatch =
                             | Syntactical -> tab.isActive
                             prop.children [
                                 Html.a [
-                                    prop.text "Sintaxe"
+                                    prop.text "Syntax"
                                     prop.onClick (fun _ -> SetPhase Syntactical |> dispatch)
                                 ]
                             ]
@@ -1199,7 +1195,7 @@ let toolbar model dispatch =
                             prop.children [
                                 Bulma.text.p [
                                     text.hasTextWeightBold
-                                    prop.text "Projeto:"
+                                    prop.text "Project:"
                                 ]
                             ]
                         ]
@@ -1209,7 +1205,7 @@ let toolbar model dispatch =
                                 Bulma.input.text [
                                     prop.value model.Project.Id
                                     prop.onTextChange (SetProjectIdText >> dispatch)
-                                    prop.placeholder "identificador"
+                                    prop.placeholder "identifier"
                                 ]
                             ]
                         ]
@@ -1218,7 +1214,7 @@ let toolbar model dispatch =
                             column.isOneQuarterMobile
                             prop.children [
                                 Bulma.button.button [
-                                    prop.text "abrir"
+                                    prop.text "open"
                                     prop.disabled idInvalid
                                     prop.onClick (fun _ -> LoadProject model.Project.Id |> dispatch)
                                     color.isDanger
@@ -1230,7 +1226,7 @@ let toolbar model dispatch =
                             column.isOneQuarterMobile
                             prop.children [
                                 Bulma.button.button [
-                                    prop.text "salvar"
+                                    prop.text "save"
                                     prop.disabled idInvalid
                                     prop.onClick (fun _ -> SaveProject model.Project |> dispatch)
                                     color.isDanger
@@ -1262,25 +1258,11 @@ let view (model: Model) (dispatch: Msg -> unit) =
             prop.style [ style.padding (length.rem 1) ]
             prop.children [
                 Bulma.navbarBrand.div [
-                    Bulma.level [
-                        Bulma.levelLeft [
-                            Bulma.title [
-                                prop.text "Formally#"
-                                title.is1
-                                color.hasTextWhite
-                                prop.onClick changeTheme
-                            ]
-                        ]
-                        Bulma.levelRight [
-                            prop.style [ style.paddingLeft (length.rem 2) ]
-                            prop.children [
-                                Html.a [
-                                    prop.text "Atenção! Clique aqui para ver as instruções de uso"
-                                    prop.href "https://github.com/baioc/FormallySharp/wiki/Instruções"
-                                    size.isSize4
-                                ]
-                            ]
-                        ]
+                    Bulma.title [
+                        prop.text "Formally#"
+                        title.is1
+                        color.hasTextWhite
+                        prop.onClick changeTheme
                     ]
                 ]
                 Bulma.navbarMenu [
@@ -1303,7 +1285,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             ]
             prop.children [
                 Html.a [
-                    prop.text "Trabalho para a disciplina de Linguagens Formais e Compiladores (INE5421)"
+                    prop.text "Built as a project during UFSC's INE5421 Formal Languages & Compilers course"
                     prop.href repoUrl
                 ]
                 Html.p "© 2021 Gabriel B. Sant'Anna, Marcelo P. G. Contin, João Vitor de S. Costa"
