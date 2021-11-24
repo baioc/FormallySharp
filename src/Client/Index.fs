@@ -419,7 +419,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             |> SweetAlert.Run
 
 
-let projectSyntactical (grammar: Grammar) analysisTable lexSpec lexer (head: string, body: string) dispatch =
+let projectSyntactical (grammar: Grammar) lexSpec lexer (head: string, body: string) dispatch =
     let viewProductionRule (head, body) =
         Bulma.columns [
             columns.isVCentered
@@ -633,17 +633,10 @@ let projectSyntactical (grammar: Grammar) analysisTable lexSpec lexer (head: str
                 column.isFull
                 prop.children [ viewSpec ]
             ]
-            match analysisTable with
-            | None -> ()
-            | Some table ->
-                Bulma.column [
-                    column.isFull
-                    prop.children [ table ]
-                ]
         ]
     ]
 
-let projectLexical spec analysisTable (kind, name, body) dispatch =
+let projectLexical spec (kind, name, body) dispatch =
     // kinds of regular definitions
     let tokenOption = "token"
     let fragmentOption = "fragment"
@@ -958,13 +951,6 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
                 column.isFull
                 prop.children [ viewSpec ]
             ]
-            match analysisTable with
-            | None -> ()
-            | Some table ->
-                Bulma.column [
-                    column.isFull
-                    prop.children [ table ]
-                ]
         ]
     ]
 
@@ -1095,17 +1081,15 @@ let main model dispatch =
                 Bulma.cardContent [
                     projectLexical
                         model.Project.Lexicon
-                        model.LexicalAnalysisTable
                         model.RegularDefinitionText
                         dispatch ]
             ]
         | Syntactical ->
             Bulma.card [
-                Bulma.cardHeader [ cardTitle "LL(1) Grammar" ]
+                Bulma.cardHeader [ cardTitle "LL(1) BNF Grammar" ]
                 Bulma.cardContent [
                     projectSyntactical
                         model.Project.Syntax
-                        model.SyntacticalAnalysisTable
                         model.Project.Lexicon
                         model.Lexer
                         model.GrammarProductionText
@@ -1126,6 +1110,22 @@ let main model dispatch =
             ]
         ]
 
+    let tableInterface =
+        Bulma.card [
+            Bulma.cardHeader [ cardTitle "Automaton" ]
+            Bulma.cardContent [
+                match model.Phase with
+                | Lexical ->
+                    match model.LexicalAnalysisTable with
+                    | None -> ()
+                    | Some table -> table
+                | Syntactical ->
+                    match model.SyntacticalAnalysisTable with
+                    | None -> ()
+                    | Some table -> table
+            ]
+        ]
+
     Bulma.columns [
         columns.isMultiline
         columns.isCentered
@@ -1139,6 +1139,10 @@ let main model dispatch =
                 column.isFull
                 column.isHalfWidescreen
                 prop.children [ recognitionInterface ]
+            ]
+            Bulma.column [
+                column.isFull
+                prop.children [ tableInterface ]
             ]
         ]
     ]
