@@ -24,8 +24,7 @@ module Identifier =
 module String =
     /// Returns an escaped version of given string for user visibility.
     let visual (str: string) =
-        str.Replace("\\", @"\\")
-           .Replace("\t", @"\t")
+        str.Replace("\t", @"\t")
            .Replace("\v", @"\v")
            .Replace("\f", @"\f")
            .Replace("\r", @"\r")

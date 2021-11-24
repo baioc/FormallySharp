@@ -512,7 +512,7 @@ let projectSyntactical (grammar: Grammar) lexSpec lexer (head: string, body: str
 
         let productionBody =
             let body = body.Trim()
-            if body = "&" then
+            if body = "" || body = "&" then
                 Some []
             else
                 let parts =
@@ -520,21 +520,15 @@ let projectSyntactical (grammar: Grammar) lexSpec lexer (head: string, body: str
                     |> Seq.map
                         (fun symbol ->
                             // a terminal symbol should refer to a token in the lexical spec
-                            // FIXME: removing a token doesn't invalidate grammar rules
+                            // TODO: removing a token doesn't invalidate grammar rules
                             match Map.tryFind symbol lexSpec with
                             | Some (TokenClass _) -> Some (Terminal symbol)
-                            // non-terminals must already exist or refer to themselves
-                            // FIXME: removing a non-terminal doesn't invalidate others
                             | notToken ->
-                                if not <| Regex.IsMatch(symbol, nonTerminalRegex) then
-                                    None
-                                else
+                                if Regex.IsMatch(symbol, nonTerminalRegex) then
                                     let symbol = symbol.Substring(1, symbol.Length - 2)
-                                    if Set.contains symbol nonTerminals
-                                       || (Option.isSome productionHead && symbol = Option.get productionHead) then
-                                        Some (NonTerminal symbol)
-                                    else
-                                        None)
+                                    Some (NonTerminal symbol)
+                                else
+                                    None)
                 try
                     parts
                     |> Seq.map Option.get
@@ -616,7 +610,7 @@ let projectSyntactical (grammar: Grammar) lexSpec lexer (head: string, body: str
                 Bulma.levelItem [
                     Bulma.button.button [
                         prop.text "Generate Parser"
-                        prop.disabled (Option.isNone lexer || Set.isEmpty grammar.Rules)
+                        prop.disabled (Set.isEmpty grammar.Rules)
                         prop.onClick (fun _ -> GenerateParser grammar |> dispatch)
                         button.isLarge
                         color.isPrimary
@@ -781,7 +775,7 @@ let projectLexical spec (kind, name, body) dispatch =
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-                            prop.text (String.visual userRegexp.String)
+                            prop.text userRegexp.String
                             text.isFamilyCode
                         ]
                     ]

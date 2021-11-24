@@ -145,7 +145,7 @@ module Regexp =
         | RightBracket
         | UnknownSequence of string
 
-    let private escaped = set @"tvfrn+*?^$\\.[]{}()|/"
+    let private escaped = set @"+*?^$\.[]{}()|/"
     let private unescaped = set [ '\x20' .. '\x7E' ] - escaped
     let private escaped_classes = set "sSdDwW"
 
@@ -164,7 +164,8 @@ module Regexp =
                 | '|' -> pos + 1, Pipe
                 | '*' -> pos + 1, Star
                 | c when Set.contains c unescaped -> pos + 1, Atom c
-                | '\\' when pos + 1 < n && Set.contains str.[pos + 1] escaped -> pos + 2, Atom str.[pos + 1]
+                | '\\' when pos + 1 < n && Set.contains str.[pos + 1] (escaped + set "tvfrn") ->
+                    pos + 2, Atom str.[pos + 1]
                 | '+' -> pos + 1, Plus
                 | '?' -> pos + 1, QuestionMark
                 | '.' -> pos + 1, Group dot
