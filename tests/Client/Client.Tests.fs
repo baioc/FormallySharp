@@ -2,6 +2,8 @@ module Client.Tests
 
 open Fable.Mocha
 
+open Shared.Tests
+
 
 let client = testList "Client" []
 

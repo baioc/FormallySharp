@@ -117,6 +117,30 @@ module Regexp =
                 Expect.equal (Regexp.maybe a) (!? a) "maybe should be an alias of (!?)"
                 Expect.equal (Regexp.many a) (!+ a) "many should be an alias of (!+)"
                 Expect.equal (Regexp.init 3 a) (a ** 3) "init should be an alterantive for (**)"
+
+        testCase "Regex parsing" <| fun _ ->
+            let inline (=?) actual expected = Expect.equal actual expected "should have been equal"
+            let parse str = str |> Regexp.tryParse |> Option.get
+            let fail str = Regexp.tryParse str =? None
+            let a = Regexp.singleton 'a'
+            let b = Regexp.singleton 'b'
+            let c = Regexp.singleton 'c'
+            parse "a|bb|cc" =? a + (b * b) + (c * c)
+            parse "a|b(b|c)c" =? a + (b * (b + c) * c)
+            parse "a|b(b|c)c*" =? a + (b * (b + c) * (!* c))
+            parse "(a|b(b|c)c)*" =? !* (a + (b * (b + c) * c))
+            parse "" =? Regexp.empty
+            parse "()" =? Regexp.empty
+            parse "(())" =? parse "()"
+            parse "[]" =? Regexp.none
+            parse "[A-Za-z_]" + Regexp.digit =? Regexp.word
+            parse "." =? Regexp.dot
+            parse @"[!--\.]" =? Regexp.ofSet [ '!' .. '-' ] + Regexp.singleton '.'
+            parse @"\(\)" =? Regexp.ofSeq "()"
+            fail "("
+            fail ")"
+            fail "())"
+            fail "{}"
     ]
 
 
