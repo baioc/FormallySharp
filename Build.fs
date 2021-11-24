@@ -33,7 +33,8 @@ Target.create "Bundle" (fun _ ->
 Target.create "Azure" (fun _ ->
     let plan = servicePlan {
         name "FormallySharp-farm"
-        sku Sku.Free
+        // sku Sku.Free
+        sku Sku.D1
     }
 
     let web = webApp {
