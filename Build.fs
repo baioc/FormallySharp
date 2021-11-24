@@ -18,13 +18,7 @@ let clientTestsPath = Path.getFullName "tests/Client"
 
 Target.create "Clean" (fun _ ->
     Shell.cleanDir deployPath
-    [ "Clean Fable", dotnet "fable clean --yes" "." // Delete *.fs.js files created by Fable
-      $"Clean {sharedPath}", dotnet "clean" sharedPath
-      $"Clean {serverPath}", dotnet "clean" serverPath
-      $"Clean {clientPath}", dotnet "clean" clientPath
-      $"Clean {sharedTestsPath}", dotnet "clean" sharedTestsPath
-      $"Clean {serverTestsPath}", dotnet "clean" serverTestsPath
-      $"Clean {clientTestsPath}", dotnet "clean" clientTestsPath ]
+    [ "Clean Fable", dotnet "fable clean --yes" "." ]
     |> runParallel
 )
 

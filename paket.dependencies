@@ -11,8 +11,6 @@ nuget Expecto
 nuget Fable.Core
 nuget Fable.Elmish
 nuget Fable.Elmish.React
-nuget Fable.Elmish.Debugger
-nuget Fable.Elmish.HMR
 nuget Fable.Mocha
 nuget Fable.React
 nuget Fable.Remoting.Client
@@ -20,5 +18,4 @@ nuget Feliz
 nuget Feliz.Bulma
 
 nuget Fake.Core.Target
-nuget Fake.IO.FileSystem
 nuget Farmer
