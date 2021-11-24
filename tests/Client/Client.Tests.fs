@@ -2,10 +2,6 @@ module Client.Tests
 
 open Fable.Mocha
 
-open Index
-open Shared
-open Shared.Tests
-
 
 let client = testList "Client" []
 
@@ -18,5 +14,4 @@ let all =
         client
     ]
 
-[<EntryPoint>]
-let main _ = Mocha.runTests all
+Mocha.runTests all |> ignore

@@ -7,7 +7,6 @@ open System.Runtime.CompilerServices
 open Formally.Automata
 open Formally.Regular
 open Formally.ContextFree
-open Formally.Converter
 
 
 /// Represents a valid string to be used as an identifier for syntax rules.
@@ -22,37 +21,17 @@ module Identifier =
     /// Checks whether the given string is a valid identifier.
     let isValid str = Regex.IsMatch(str, $"^{regex}$")
 
-[<Extension>]
 module String =
     /// Returns an escaped version of given string for user visibility.
     let visual (str: string) =
-        str.Replace("\r\n", "\\r\\n")
-           .Replace("\n", "\\n")
-           .Replace("\t", "\\t")
-           .Replace(" ", "\u00B7") // <- unicode for visual space
+        str.Replace("\\", @"\\")
+           .Replace("\t", @"\t")
+           .Replace("\v", @"\v")
+           .Replace("\f", @"\f")
+           .Replace("\r", @"\r")
+           .Replace("\n", @"\n")
+           .Replace(" ",  "\u00B7") // <- unicode for visual space
 
-
-[<Extension>]
-module Regexp =
-    /// Unescapes some sequences into their "raw" characters.
-    let unescape (str: string) =
-        // XXX: for some reason, this works while `Regex.Replace` doesn't
-        str.Replace(@"\t",   "\t")
-           .Replace(@"\r\n", "\r\n")
-           .Replace(@"\n",   "\n")
-           .Replace(@"\\",   "\\")
-
-    /// The inverse of `unescape`.
-    let escape (str: string) =
-        str.Replace("\\",   @"\\")
-           .Replace("\t",   @"\t")
-           .Replace("\r\n", @"\r\n")
-           .Replace("\n",   @"\n")
-
-    let tryParse str =
-        let str = unescape str
-        // FIXME: even when input is not valid, this will still give a (weird) regexp
-        Some <| Converter.convertRegularDefinitionTextToRegexp(str)
 
 /// Regexp with a user-provided string representation.
 [<AutoOpen>] // so that we may use unqualified constructors

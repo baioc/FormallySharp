@@ -14,6 +14,7 @@ open Shared
 
 // XXX: we need the alternative types for projects that can be stored in LiteDB,
 // see the issue with sets: https://github.com/Zaid-Ajaj/LiteDB.FSharp/issues/65
+// PS: these need to be public for LiteDB...
 type Grammar' =
     { Initial: Identifier
       Rules: List<ContextFreeProduction<Identifier, Identifier>> }

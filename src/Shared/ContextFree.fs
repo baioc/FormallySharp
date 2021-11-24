@@ -132,12 +132,6 @@ module Grammar =
         |> Seq.map (fun entry -> entry.Key, entry.Value)
         |> Map.ofSeq
 
-    let eliminateLeftRecursions (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
-        failwith "TODO: Grammar.eliminateLeftRecursions"
-
-    let leftFactor (grammar: Grammar<'T, 'N>) : Grammar<'T, 'N> =
-        failwith "TODO: Grammar.leftFactor"
-
 
 open Formally.Automata
 

@@ -35,79 +35,6 @@ module Grammar =
               "D" := [ NonTerminal "C"; NonTerminal "D" ]
           ] }
 
-    let grammarWithLeftRecursions =
-        { Initial = "S"
-          Rules = set [
-              // S -> Aa | b
-              "S" := [ NonTerminal "A"; Terminal 'a' ]
-              "S" := [ Terminal 'b'; ]
-              // A -> Ac | Sd | a
-              "A" := [ NonTerminal "A"; Terminal 'c' ]
-              "A" := [ NonTerminal "S"; Terminal 'd' ]
-              "A" := [ Terminal 'a'; ]
-          ] }
-
-    let grammarWithoutLeftRecursions =
-        { Initial = "S"
-          Rules = set [
-              // S -> Aa | b
-              "S" := [ NonTerminal "A"; Terminal 'a' ]
-              "S" := [ Terminal 'b'; ]
-              // A -> bdA' | aA'
-              "A" := [ Terminal 'b'; Terminal 'd'; NonTerminal "A'"]
-              "A" := [ Terminal 'a'; NonTerminal "A'"]
-              // A' -> cA' | adA' | &
-              "A'" := [ Terminal 'c'; NonTerminal "A'"]
-              "A'" := [ Terminal 'a'; Terminal 'd'; NonTerminal "A'"]
-              "A'" := []
-          ] }
-
-    let grammarToLeftFactor =
-        { Initial = "S"
-          Rules = set [
-              // S -> AC | BC
-              "S" := [ NonTerminal "A"; NonTerminal "C" ]
-              "S" := [ NonTerminal "B"; NonTerminal "C" ]
-              // A -> aD | cC
-              "A" := [ Terminal 'a'; NonTerminal "D" ]
-              "A" := [ Terminal 'c'; NonTerminal "C" ]
-              // B -> aB | dD
-              "B" := [ Terminal 'a'; NonTerminal "B" ]
-              "B" := [ Terminal 'd'; NonTerminal "D" ]
-              // C -> eC | eA
-              "C" := [ Terminal 'e'; NonTerminal "C" ]
-              "C" := [ Terminal 'e'; NonTerminal "A" ]
-              // D -> fD | CB
-              "D" := [ Terminal 'f'; NonTerminal "D" ]
-              "D" := [ NonTerminal "C"; NonTerminal "B" ]
-          ] }
-
-    let grammarLeftFactored =
-        { Initial = "S"
-          Rules = set [
-              // S -> aS' | aCC | dDC
-              "S" := [ Terminal 'a'; NonTerminal "S'" ]
-              "S" := [ Terminal 'c'; NonTerminal "C"; NonTerminal "C" ]
-              "S" := [ Terminal 'd'; NonTerminal "D"; NonTerminal "C" ]
-              // S' -> DC | BC
-              "S'" := [ NonTerminal "D"; NonTerminal "C" ]
-              "S'" := [ NonTerminal "B"; NonTerminal "C" ]
-              // A -> aD | cC
-              "A" := [ Terminal 'a'; NonTerminal "D" ]
-              "A" := [ Terminal 'c'; NonTerminal "C" ]
-              // B -> aB | dD
-              "B" := [ Terminal 'a'; NonTerminal "B" ]
-              "B" := [ Terminal 'd'; NonTerminal "D" ]
-              // C -> eC'
-              "C" := [ Terminal 'e'; NonTerminal "C'" ]
-              // C' -> C | A
-              "C'" := [ NonTerminal "C"]
-              "C'" := [ NonTerminal "A"]
-              // D -> fD | CB
-              "D" := [ Terminal 'f'; NonTerminal "D" ]
-              "D" := [ NonTerminal "C"; NonTerminal "B" ]
-          ] }
-
     let tests = testList "Grammars" [
         testCase "FIRST sets" <| fun _ ->
             let testFirst symbols expected =
@@ -130,18 +57,6 @@ module Grammar =
             testFollow "B" (set [ 'b' ])
             testFollow "C" (set [ 'c'; 'a'; 'b'; '$' ])
             testFollow "D" (set [ 'a'; 'b'; 'c'; '$' ])
-
-        ptestCase "Left recursion elimination" <| fun _ ->
-            Expect.equal
-                (Grammar.eliminateLeftRecursions grammarWithLeftRecursions)
-                grammarWithoutLeftRecursions
-                "Failed to eliminate left recursions"
-
-        ptestCase "Left-factoring" <| fun _ ->
-            Expect.equal
-                (Grammar.leftFactor grammarToLeftFactor)
-                grammarLeftFactored
-                "Failed to left-factor the grammar"
     ]
 
 

@@ -2,15 +2,15 @@ module Server.Tests
 
 open Expecto
 
-open Server
 open Shared
 open Shared.Tests
+open Server
 
 
 let server = testList "Server" [
     testCase "DB write followed by read" <| fun _ ->
         let storage = Storage()
-        let emptyProject =
+        let emptyProject : Project =
             { Id = ""
               Lexicon = Map.empty
               Syntax = { Initial = ""; Rules = Set.empty } }
@@ -25,5 +25,4 @@ let all =  testList "All" [
     server
 ]
 
-[<EntryPoint>]
-let main _ = runTests { defaultConfig with verbosity = Logging.Debug } all
+runTests { defaultConfig with verbosity = Logging.Debug } all |> ignore

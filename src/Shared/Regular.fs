@@ -115,6 +115,160 @@ module Regexp =
     /// Alternative for (**)
     let inline init n (r: Regexp<'Symbol>) = r ** n
 
+    /// Built-in character class.
+    let word, notWord, digit, notDigit, space, notSpace, dot =
+        let space = set [ ' '; '\t'; '\r'; '\n'; '\v'; '\f' ]
+        let all = set [ '\x20' .. '\x7E' ] + space
+        let digit = set [ '0' .. '9' ]
+        let letter = set [ 'A' .. 'z' ]
+        let word = letter + digit + set [ '_' ]
+        let w = ofSet word
+        let W = ofSet (all - word)
+        let d = ofSet digit
+        let D = ofSet (all - digit)
+        let s = ofSet space
+        let S = ofSet (all - space)
+        let dot = ofSet (all - set [ '\n'; '\r' ])
+        w, W, d, D, s, S, dot
+
+    type private Token =
+        | Terminator
+        | LeftParenthesis
+        | RightParenthesis
+        | Pipe
+        | Star
+        | Atom of char
+        | Plus
+        | QuestionMark
+        | Group of Regexp
+        | LeftBracket
+        | RightBracket
+        | UnknownSequence of string
+
+    let private escaped = set @"tvfrn+*?^$\\.[]{}()|/"
+    let private unescaped = set [ '\x20' .. '\x7E' ] - escaped
+    let private escaped_classes = set "sSdDwW"
+
+    /// Tries to parse a regexp based on standard-ish Perl regex syntax.
+    let tryParse str =
+        let n = String.length str
+
+        // prefix tree lexer
+        let next pos =
+            if pos >= n then
+                pos, Terminator
+            else
+                match str.[pos] with
+                | '(' -> pos + 1, LeftParenthesis
+                | ')' -> pos + 1, RightParenthesis
+                | '|' -> pos + 1, Pipe
+                | '*' -> pos + 1, Star
+                | c when Set.contains c unescaped -> pos + 1, Atom c
+                | '\\' when pos + 1 < n && Set.contains str.[pos + 1] escaped -> pos + 2, Atom str.[pos + 1]
+                | '+' -> pos + 1, Plus
+                | '?' -> pos + 1, QuestionMark
+                | '.' -> pos + 1, Group dot
+                | '\\' when pos + 1 < n && Set.contains str.[pos + 1] escaped_classes ->
+                    let charClass =
+                        match str.[pos + 1] with
+                        | 's' -> space
+                        | 'S' -> notSpace
+                        | 'd' -> digit
+                        | 'D' -> notDigit
+                        | 'w' -> word
+                        | 'W' -> notWord
+                        | _ -> failwithf "unreachable"
+                    pos + 2, Group charClass
+                | '[' -> pos + 1, LeftBracket
+                | ']' -> pos + 1, RightBracket
+                | c -> n, UnknownSequence str.[pos..]
+
+        // recursive descent parser
+        let rec expression pos lookahead =
+            match lookahead with
+            | Atom _ | Group _ | LeftParenthesis | LeftBracket -> choice pos lookahead
+            | Terminator | RightParenthesis -> pos - 1, empty
+            | token -> failwithf "Syntax error: unexpected %O" token
+        and choice pos lookahead =
+            match lookahead with
+            | Atom _ | Group _ | LeftParenthesis | LeftBracket ->
+                let pos, lhs = sequence pos lookahead
+                match next pos with
+                | pos, Pipe ->
+                    let pos, rhs = next pos ||> choice
+                    pos, lhs + rhs
+                | _, Terminator | _, RightParenthesis -> pos, lhs
+                | _, token -> failwithf "Syntax error: unexpected %O" token
+            | token -> failwithf "Syntax error: unexpected %O" token
+        and sequence pos lookahead =
+            match lookahead with
+            | Atom _ | Group _ | LeftParenthesis | LeftBracket ->
+                let pos, lhs = term pos lookahead
+                match next pos with
+                | _, Atom _ | _, Group _ | _, LeftParenthesis | _, LeftBracket as next ->
+                    let pos, lookahead = next
+                    let pos, rhs = sequence pos lookahead
+                    pos, lhs * rhs
+                | _, Terminator | _, Pipe | _, RightParenthesis -> pos, lhs
+                | _, token -> failwithf "Syntax error: unexpected %O" token
+            | token -> failwithf "Syntax error: unexpected %O" token
+        and term pos lookahead =
+            match lookahead with
+            | Atom _ | Group _ | LeftParenthesis | LeftBracket ->
+                let pos, expr = factor pos lookahead
+                match next pos with
+                | pos, Star -> pos, !* expr
+                | pos, Plus -> pos, !+ expr
+                | pos, QuestionMark -> pos, !? expr
+                | _, Terminator | _, Atom _ | _, Group _ | _, LeftParenthesis | _, LeftBracket | _, Pipe | _, RightParenthesis -> pos, expr
+                | _, token -> failwithf "Syntax error: unexpected %O" token
+            | token -> failwithf "Syntax error: unexpected %O" token
+        and factor pos lookahead =
+            match lookahead with
+            | Atom atom -> pos, Literal atom
+            | Group group -> pos, group
+            | LeftParenthesis ->
+                let pos, expr = next pos ||> expression
+                match next pos with
+                | pos, RightParenthesis -> pos, expr
+                | _, notRParen -> failwithf "Syntax error at %d: expected %O, found %O" pos RightParenthesis notRParen
+            | LeftBracket ->
+                let pos, expr = next pos ||> charset
+                match next pos with
+                | pos, RightBracket -> pos, expr
+                | _, notRBrack -> failwithf "Syntax error at %d: expected %O, found %O" pos RightBracket notRBrack
+            | token -> failwithf "Syntax error: unexpected %O" token
+        and charset pos lookahead =
+            match lookahead with
+            | RightBracket -> pos - 1, none
+            | Group group ->
+                let pos, rest = next pos ||> charset
+                pos, group + rest
+            | Atom a ->
+                let pos, lookahead, set =
+                    match next pos with
+                    | pos, Atom b when b = '-' ->
+                        match next pos with
+                        | pos, (Atom b as lookahead) -> pos, lookahead, ofSet [ a .. b ]
+                        | _, notAtom -> failwithf "Syntax error at %d: expected an atom, found %O" pos notAtom
+                    | pos, lookahead ->
+                        pos, lookahead, singleton a
+                let pos, rest = charset pos lookahead
+                pos, set + rest
+            | token -> failwithf "Syntax error: unexpected %O" token
+
+        // starts the parser and checks for unconsumed input
+        try
+            if str = "" then
+                Some empty
+            else
+                let pos, expr = next 0 ||> expression
+                match snd <| next pos with
+                | Terminator -> Some expr
+                | token -> failwithf "Syntax error: unexpected %O" token
+        with
+        | ex -> None
+
 
 open Formally.Automata
 

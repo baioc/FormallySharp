@@ -16,7 +16,6 @@ open Shared
 module Shared =
     open Formally.Automata.Tests
     open Formally.Regular.Tests
-    open Formally.Converter.Tests
     open Formally.ContextFree.Tests
 
     let (:=) head body = head, body
@@ -26,7 +25,6 @@ module Shared =
         Automaton.tests
         Regexp.tests
         Nfa.tests
-        Converter.tests
         Grammar.tests
         Dpda.tests
 

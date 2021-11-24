@@ -8,7 +8,6 @@
     <Compile Include="Automata.fs" />
     <Compile Include="Regular.fs" />
     <Compile Include="ContextFree.fs" />
-    <Compile Include="Converter.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

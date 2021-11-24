@@ -9,10 +9,9 @@ open Fable.Remoting.Client
 open Feliz
 open Feliz.Bulma
 
-open Shared
 open Formally.Regular
 open Formally.ContextFree
-open Formally.Converter
+open Shared
 
 Fable.Core.JsInterop.importAll "./style.css"
 
@@ -87,7 +86,7 @@ let viewLexer (lexer: Lexer) =
                         ]
                         for symbol in lexer.Automaton.Alphabet do
                             Html.th [
-                                prop.text (sprintf "%c" symbol |> Regexp.escape |> String.visual)
+                                prop.text (sprintf "%c" symbol |> String.visual)
                                 text.isFamilyMonospace
                             ]
                     ]
@@ -308,7 +307,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
     | GotError ex ->
         let toastAlert =
-            ToastAlert("server error: " + string ex.Message)
+            ToastAlert("server error: " + ex.Message)
                 .Position(AlertPosition.Top)
                 .ConfirmButton(true)
                 .Timeout(13000)
@@ -420,7 +419,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             |> SweetAlert.Run
 
 
-let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: string) dispatch =
+let projectSyntactical (grammar: Grammar) analysisTable lexSpec lexer (head: string, body: string) dispatch =
     let viewProductionRule (head, body) =
         Bulma.columns [
             columns.isVCentered
@@ -526,7 +525,7 @@ let projectSyntactical grammar analysisTable lexSpec lexer (head: string, body: 
                             | Some (TokenClass _) -> Some (Terminal symbol)
                             // non-terminals must already exist or refer to themselves
                             // FIXME: removing a non-terminal doesn't invalidate others
-                            | _ ->
+                            | notToken ->
                                 if not <| Regex.IsMatch(symbol, nonTerminalRegex) then
                                     None
                                 else
@@ -655,17 +654,18 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
             Regexp.tryParse body
         else
             // make a map of (name -> regex fragment) for inlining in other definitions
-            let fragments =
-                Map.toSeq spec
-                |> Seq.choose
-                    (fun (name, def) ->
-                        match def with
-                        | Fragment r -> Some (name, r.String)
-                        | notFragment -> None)
-                |> Map.ofSeq
+            Map.toSeq spec
+            |> Seq.choose
+                (fun (name, def) ->
+                    match def with
+                    | Fragment r -> Some (name, r.String)
+                    | notFragment -> None)
             // inline fragments (if any), then parse the regex
             // FIXME: changing a fragment doesn't change regexps it is included in
-            Converter.convertTokenToRegexString(body, fragments)
+            |> Seq.fold
+                (fun (body: string) (name, fragment) ->
+                    body.Replace("{" + name + "}", "(" + fragment + ")"))
+                body
             |> Regexp.tryParse
 
     let nameIsValid = Identifier.isValid name
@@ -788,11 +788,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
                     prop.style [ style.padding (length.rem 0.5) ]
                     prop.children [
                         Bulma.text.p [
-#if DEBUG                   // during development, show Regexp tree
-                            prop.text (string userRegexp.Regexp)
-#else                       // on release, show user-facing regex
                             prop.text (String.visual userRegexp.String)
-#endif
                             text.isFamilyCode
                         ]
                     ]
@@ -922,7 +918,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
                         prop.children [
                             Bulma.input.text [
                                 prop.value body
-                                prop.placeholder "regular expression"
+                                prop.placeholder "regex with {fragment}"
                                 prop.onChange
                                     (fun body ->
                                         (kind, name, body)
@@ -972,7 +968,7 @@ let projectLexical spec analysisTable (kind, name, body) dispatch =
         ]
     ]
 
-let recognition lexer symbolTable parser dispatch =
+let recognition input lexer symbolTable parser dispatch =
     let hasLexer = Option.isSome lexer
     let lexicalOk =
         symbolTable
@@ -999,8 +995,9 @@ let recognition lexer symbolTable parser dispatch =
                 column.isFullMobile
                 prop.children [
                     Bulma.textarea [
-                        prop.custom ("rows", 24)
+                        prop.content input
                         prop.onChange (SetInputText >> dispatch)
+                        prop.custom ("rows", 24)
                         prop.placeholder "Test input goes here."
                         if not hasLexer then
                             color.hasBackgroundGreyLighter
@@ -1063,7 +1060,7 @@ let recognition lexer symbolTable parser dispatch =
                                                 else color.hasTextInfo
                                             ]
                                             Html.td [
-                                                prop.text (lexeme |> Regexp.escape |> String.visual)
+                                                prop.text (lexeme |> String.visual)
                                                 text.isFamilyMonospace
                                             ]
                                             Html.td [
@@ -1121,6 +1118,7 @@ let main model dispatch =
             Bulma.cardHeader [ cardTitle "Recognition" ]
             Bulma.cardContent [
                 recognition
+                    model.InputText
                     model.Lexer
                     model.SymbolTable
                     model.Parser
@@ -1285,7 +1283,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
             ]
             prop.children [
                 Html.a [
-                    prop.text "Built as a project during UFSC's INE5421 Formal Languages & Compilers course"
+                    prop.text "Built for UFSC's INE5421 Formal Languages & Compilers course"
                     prop.href repoUrl
                 ]
                 Html.p "© 2021 Gabriel B. Sant'Anna, Marcelo P. G. Contin, João Vitor de S. Costa"
