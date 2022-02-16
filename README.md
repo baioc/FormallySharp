@@ -7,6 +7,12 @@
 Formally# is an online formal language designer.
 **Check it out at [formallysharp.azurewebsites.net](https://formallysharp.azurewebsites.net/)**
 
+To get a feel for how to use it, open the example project, `JSON`, and use the buttons to generate a lexer and a parser.
+After that, you can start typing in the recognition box. Your input will be syntactically checked on the fly.
+![JSON](https://user-images.githubusercontent.com/27034173/143298549-9a0a42bc-6346-48b0-9c62-8d7fd5c307c5.png)
+
+If you're here to see how it works and what algorithms are used, please refer to the [Shared](./src/Shared) part of the codebase.
+
 
 ## SAFE Stack
 
