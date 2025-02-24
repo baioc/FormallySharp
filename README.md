@@ -5,7 +5,7 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/baioc/FormallySharp?label=commits)
 
 Formally# is an online formal language designer.
-**Check it out at [formallysharp.azurewebsites.net](https://formallysharp.azurewebsites.net/)**
+~~Check it out at [formallysharp.azurewebsites.net](https://formallysharp.azurewebsites.net/)~~ (no longer online)
 
 To get a feel for how to use it, open the example project, `JSON`, and use the buttons to generate a lexer and a parser.
 After that, you can start typing in the recognition box. Your input will be syntactically checked on the fly.
